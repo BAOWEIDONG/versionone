@@ -30,7 +30,8 @@ export const MOCK_STUDENTS: { id: string; name: string; age: number; gender: 'ma
   { id: 's7', name: '郑爽', age: 24, gender: 'female', phone: '13800000007' },
   { id: 's8', name: '王强', age: 35, gender: 'male', phone: '13800000008' },
   { id: 's9', name: '刘梅', age: 33, gender: 'female', phone: '13800000009' },
-  { id: 's10', name: '孙悟空', age: 30, gender: 'male', phone: '13800000010' }
+  { id: 's10', name: '孙悟空', age: 30, gender: 'male', phone: '13800000010' },
+  { id: 's11', name: '钱多多', age: 27, gender: 'male', phone: '13800000011' }
 ];
 
 // 完整打卡天数：今天往前连续 N 天，三餐+运动都完成
@@ -883,6 +884,8 @@ export const MOCK_ACCOUNTS: Account[] = [
   { id: 's8', phone: '13800000008', name: '王强', role: 'student', campIds: ['camp2'], active: true, createdAt: iso(-2, '08:00:00') },
   { id: 's9', phone: '13800000009', name: '刘梅', role: 'student', campIds: ['camp2'], active: false, createdAt: iso(-2, '08:00:00') },
   { id: 's10', phone: '13800000010', name: '孙悟空', role: 'student', campIds: ['camp1', 'camp2'], active: true, createdAt: iso(-15, '08:00:00') },
+  // 仅属于未开营营期（camp3）的学员，用于演示"营期未开始禁止打卡"
+  { id: 's11', phone: '13800000011', name: '钱多多', role: 'student', campIds: ['camp3'], active: true, createdAt: iso(7, '08:00:00') },
 ];
 
 /** 积分商城商品 */

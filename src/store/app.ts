@@ -657,6 +657,26 @@ export const useAppStore = defineStore('app', () => {
     return false;
   }
 
+  /** 营期是否已开营（当前日期 >= 开营日期；status 优先，无 status 时按 startDate 判断） */
+  function isCampStarted(camp: Camp | null | undefined): boolean {
+    if (!camp) return true; // 无营期信息时不限制
+    if (camp.status === 'upcoming') return false;
+    if (camp.status === 'active' || camp.status === 'ended') return true;
+    if (camp.startDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const start = new Date(camp.startDate);
+      start.setHours(0, 0, 0, 0);
+      return today >= start;
+    }
+    return true;
+  }
+
+  /** 学员当前营期是否已开营（学员能否打卡） */
+  function canStudentCheckIn(studentId: string): boolean {
+    return isCampStarted(getStudentCamp(studentId));
+  }
+
   // ─── 按营期过滤打卡记录（campId 精确匹配，不靠日期范围猜测） ──────
   function getCampDietRecords(campId: string) {
     return dietRecords.value.filter((r) => r.campId === campId);
@@ -838,6 +858,8 @@ export const useAppStore = defineStore('app', () => {
     getStudentCamp,
     getCampDays,
     canViewCampReport,
+    isCampStarted,
+    canStudentCheckIn,
     getStudentsByCamp,
     getAllStudents,
     getCoachCamps,

@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { useAppStore } from '../store/app';
 import { Card, GenderAvatar } from './ui';
 import { Activity, Coffee, Calendar, FileText, Scale, PlayCircle, LogOut, Medal, Trophy, Gift, Flame, BookOpen, Zap, MessageCircle, Bell, X, ChevronRight, Sparkles, ChevronDown, TrendingDown, TrendingUp, Minus, Target } from 'lucide-vue-next';
-import { Tabbar as VanTabbar, TabbarItem as VanTabbarItem, Popup as VanPopup } from 'vant';
+import { Tabbar as VanTabbar, TabbarItem as VanTabbarItem, Popup as VanPopup, showToast } from 'vant';
 import { rankStudents } from '../lib/scoring';
 import { getTodayQuote } from '../lib/motivationalQuotes';
 import { calculateStreak } from '../lib/streak';
@@ -126,6 +126,29 @@ const campDay = computed(() => {
   const diffDays = Math.floor((now.getTime() - start.getTime()) / 86400000) + 1;
   return Math.max(1, diffDays);
 });
+
+// ─── 营期未开始：禁止打卡入口 ─────────────────────────────
+const campNotStarted = computed(() => {
+  if (!activeCamp.value) return false;
+  return !store.isCampStarted(activeCamp.value);
+});
+// 未开始营期的权威状态（用于提示文案）：优先 status，其次按日期推断
+const campNotStartedText = computed(() => {
+  const camp = activeCamp.value;
+  if (!camp) return '营期尚未开始';
+  if (camp.startDate) {
+    return `营期尚未开始（${camp.startDate} 开营），暂不能打卡`;
+  }
+  return '营期尚未开始，暂不能打卡';
+});
+// 打卡入口统一拦截：未开始时弹提示，不进入打卡页
+function guardCheckin(view: string) {
+  if (campNotStarted.value) {
+    showToast(campNotStartedText.value);
+    return;
+  }
+  store.setCurrentView(view);
+}
 
 // 活动配置（按营期独立配置，取代旧的全局 activityConfig）
 const activityConfig = computed(() => store.getActivityConfig(activeCampId.value));
@@ -524,7 +547,7 @@ onMounted(() => {
       <!-- 体重 + 排名（2列卡片） -->
       <div class="grid grid-cols-2 gap-4 items-stretch">
         <!-- 最新体重卡（含体重变化 + 目标进度） -->
-        <Card class="flex flex-col justify-center p-5 cursor-pointer hover:shadow-lg transition-shadow border-0 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.14)] relative overflow-hidden h-full" @click="store.setCurrentView('weight-checkin')">
+        <Card :class="['flex flex-col justify-center p-5 border-0 relative overflow-hidden h-full transition-all', campNotStarted ? 'cursor-not-allowed opacity-60 grayscale' : 'cursor-pointer hover:shadow-lg shadow-[0_4px_20px_-8px_rgba(15,23,42,0.14)]']" @click="guardCheckin('weight-checkin')">
           <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#07C160]/20 to-teal-100 rounded-full blur-2xl transform translate-x-1/4 -translate-y-1/4 z-0 pointer-events-none"></div>
           <div class="relative z-10">
             <div class="flex items-center gap-1 mb-2">
@@ -583,36 +606,36 @@ onMounted(() => {
           每日打卡任务
         </h3>
         <div class="grid grid-cols-3 gap-3">
-          <Card :class="['flex flex-col items-center justify-center py-6 cursor-pointer hover:ring-2 ring-[#07C160] transition-all border-0 shadow-sm card-enter relative overflow-hidden active:scale-[0.96]', visibleCards.includes(3) ? 'card-enter-active' : '']" @click="store.setCurrentView('exercise')">
+          <Card :class="['flex flex-col items-center justify-center py-6 border-0 shadow-sm card-enter relative overflow-hidden transition-all', campNotStarted ? 'cursor-not-allowed opacity-60 grayscale' : 'cursor-pointer hover:ring-2 ring-[#07C160] active:scale-[0.96]', visibleCards.includes(3) ? 'card-enter-active' : '']" @click="guardCheckin('exercise')">
             <div class="absolute -top-6 -right-4 w-24 h-24 bg-gradient-to-br from-[#07C160]/12 to-green-50 rounded-full blur-2xl pointer-events-none"></div>
             <div class="relative z-10 flex flex-col items-center">
-              <div :class="['w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm transition-transform hover:scale-110', todayExerciseDone ? 'bg-[#07C160]/15 text-[#07C160]' : 'bg-gradient-to-br from-[#07C160] to-green-500 text-white animate-pulse']">
+              <div :class="['w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm', campNotStarted ? 'bg-gray-200 text-gray-400' : todayExerciseDone ? 'bg-[#07C160]/15 text-[#07C160]' : 'bg-gradient-to-br from-[#07C160] to-green-500 text-white animate-pulse hover:scale-110']">
                 <Activity class="h-6 w-6" />
               </div>
               <div class="text-sm font-bold text-gray-900 mb-0.5">运动打卡</div>
-              <div :class="['text-[10px]', todayExerciseDone ? 'text-[#07C160] font-bold' : 'text-gray-400']">{{ todayExerciseDone ? '已完成 ✓' : '记录消耗' }}</div>
+              <div :class="['text-[10px]', campNotStarted ? 'text-gray-400' : todayExerciseDone ? 'text-[#07C160] font-bold' : 'text-gray-400']">{{ campNotStarted ? '营期未开始' : (todayExerciseDone ? '已完成 ✓' : '记录消耗') }}</div>
             </div>
           </Card>
 
-          <Card :class="['flex flex-col items-center justify-center py-6 cursor-pointer hover:ring-2 ring-[#FF976A] transition-all border-0 shadow-sm card-enter relative overflow-hidden active:scale-[0.96]', visibleCards.includes(4) ? 'card-enter-active' : '']" @click="store.setCurrentView('diet')">
+          <Card :class="['flex flex-col items-center justify-center py-6 border-0 shadow-sm card-enter relative overflow-hidden transition-all', campNotStarted ? 'cursor-not-allowed opacity-60 grayscale' : 'cursor-pointer hover:ring-2 ring-[#FF976A] active:scale-[0.96]', visibleCards.includes(4) ? 'card-enter-active' : '']" @click="guardCheckin('diet')">
             <div class="absolute -top-6 -right-4 w-24 h-24 bg-gradient-to-br from-[#FF976A]/12 to-orange-50 rounded-full blur-2xl pointer-events-none"></div>
             <div class="relative z-10 flex flex-col items-center">
-              <div :class="['w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm transition-transform hover:scale-110', todayDietDone ? 'bg-[#FF976A]/15 text-[#FF976A]' : 'bg-gradient-to-br from-[#FF976A] to-orange-400 text-white animate-pulse']">
+              <div :class="['w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm', campNotStarted ? 'bg-gray-200 text-gray-400' : todayDietDone ? 'bg-[#FF976A]/15 text-[#FF976A]' : 'bg-gradient-to-br from-[#FF976A] to-orange-400 text-white animate-pulse hover:scale-110']">
                 <Coffee class="h-6 w-6" />
               </div>
               <div class="text-sm font-bold text-gray-900 mb-0.5">饮食打卡</div>
-              <div :class="['text-[10px]', todayDietDone ? 'text-[#07C160] font-bold' : 'text-gray-400']">{{ todayDietLabel }}</div>
+              <div :class="['text-[10px]', campNotStarted ? 'text-gray-400' : todayDietDone ? 'text-[#07C160] font-bold' : 'text-gray-400']">{{ campNotStarted ? '营期未开始' : todayDietLabel }}</div>
             </div>
           </Card>
 
-          <Card :class="['flex flex-col items-center justify-center py-6 cursor-pointer hover:ring-2 ring-[#1677FF] transition-all border-0 shadow-sm card-enter relative overflow-hidden active:scale-[0.96]', visibleCards.includes(5) ? 'card-enter-active' : '']" @click="store.setCurrentView('weight-checkin')">
+          <Card :class="['flex flex-col items-center justify-center py-6 border-0 shadow-sm card-enter relative overflow-hidden transition-all', campNotStarted ? 'cursor-not-allowed opacity-60 grayscale' : 'cursor-pointer hover:ring-2 ring-[#1677FF] active:scale-[0.96]', visibleCards.includes(5) ? 'card-enter-active' : '']" @click="guardCheckin('weight-checkin')">
             <div class="absolute -top-6 -right-4 w-24 h-24 bg-gradient-to-br from-[#1677FF]/12 to-blue-50 rounded-full blur-2xl pointer-events-none"></div>
             <div class="relative z-10 flex flex-col items-center">
-              <div :class="['w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm transition-transform hover:scale-110', todayWeightDone ? 'bg-[#1677FF]/15 text-[#1677FF]' : 'bg-gradient-to-br from-[#1677FF] to-blue-500 text-white animate-pulse']">
+              <div :class="['w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm', campNotStarted ? 'bg-gray-200 text-gray-400' : todayWeightDone ? 'bg-[#1677FF]/15 text-[#1677FF]' : 'bg-gradient-to-br from-[#1677FF] to-blue-500 text-white animate-pulse hover:scale-110']">
                 <Scale class="h-6 w-6" />
               </div>
               <div class="text-sm font-bold text-gray-900 mb-0.5">体重打卡</div>
-              <div :class="['text-[10px]', todayWeightDone ? 'text-[#07C160] font-bold' : 'text-gray-400']">{{ todayWeightDone ? '已完成 ✓' : '见证蜕变' }}</div>
+              <div :class="['text-[10px]', campNotStarted ? 'text-gray-400' : todayWeightDone ? 'text-[#07C160] font-bold' : 'text-gray-400']">{{ campNotStarted ? '营期未开始' : (todayWeightDone ? '已完成 ✓' : '见证蜕变') }}</div>
             </div>
           </Card>
         </div>
