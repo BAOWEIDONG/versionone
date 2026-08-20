@@ -15,7 +15,13 @@ const searchQuery = ref('');
 const showCampPicker = ref(false);
 
 const availableCamps = computed(() => store.camps);
-const activeCampId = computed(() => store.selectedCampId); // null = 全部营期
+// 未选具体营期时回落到第一个 active 营期，避免"全部营期"跨期汇总导致多营期学员重复计分（与学员端/排名页口径一致）
+const activeCampId = computed(() => {
+  if (store.selectedCampId) return store.selectedCampId;
+  const active = store.camps.find((c) => c.status === 'active');
+  const first = store.camps.length > 0 ? store.camps[0] : null;
+  return active?.id || first?.id || null;
+});
 const activeCampName = computed(() => {
   if (!activeCampId.value) return '全部营期';
   return store.camps.find((c) => c.id === activeCampId.value)?.name || '全部营期';

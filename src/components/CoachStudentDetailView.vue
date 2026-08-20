@@ -24,9 +24,10 @@ const selectedCamp = computed(() => studentCamps.value.find(c => c.id === select
 
 watch(() => store.selectedStudentId, (id) => {
   if (id) {
-    if (store.selectedCampId && studentCamps.value.some(c => c.id === store.selectedCampId)) {
-      selectedCampId.value = store.selectedCampId;
-    } else if (!store.selectedCampId) {
+    if (store.detailSelectedCampId && studentCamps.value.some(c => c.id === store.detailSelectedCampId)) {
+      // 详情流已选营期 -> 继承（不影响全局）
+      selectedCampId.value = store.detailSelectedCampId;
+    } else if (!store.detailSelectedCampId) {
       // 全部营期模式 -> 不选具体营期，展示全部数据
       selectedCampId.value = '';
     } else {
@@ -37,7 +38,7 @@ watch(() => store.selectedStudentId, (id) => {
 }, { immediate: true });
 
 watch(selectedCampId, (newId) => {
-  if (newId) store.selectedCampId = newId;
+  store.detailSelectedCampId = newId || null;
 });
 
 // 按营期过滤运动记录

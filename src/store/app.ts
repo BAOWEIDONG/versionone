@@ -158,6 +158,9 @@ export const useAppStore = defineStore('app', () => {
   /** 学员端当前选中的营期 ID（多期学员可切换；null 时自动取第一个 active 营期） */
   const selectedCampId = ref<string | null>(null);
 
+  /** 学员详情（营养师/教练查看某学员档案）流内的营期上下文，独立于全局 selectedCampId，不影响首页营期 */
+  const detailSelectedCampId = ref<string | null>(null);
+
   /** 刚完成打卡标记（用于返回首页时触发成就/里程碑检测） */
   const justCheckedIn = ref(false);
 
@@ -308,6 +311,9 @@ export const useAppStore = defineStore('app', () => {
   // 首期上线版：学员端底部Tab为 首页/档案（移除活动/消息）
   const TAB_ROOTS: View[] = ['dashboard', 'health-profile', 'coach-dashboard', 'dietitian-dashboard', 'dietitian-unannotated-list', 'dietitian-config'];
 
+  /** 学员详情流视图：在此流内继承 detailSelectedCampId，离开则清空（不污染全局 selectedCampId） */
+  const DETAIL_FLOW_VIEWS: View[] = ['dietitian-student-detail', 'coach-student-detail', 'pointsDetail'];
+
   function setCurrentView(view: View) {
     const current = viewHistory.value[viewHistory.value.length - 1];
     if (current === view) return;
@@ -317,15 +323,22 @@ export const useAppStore = defineStore('app', () => {
       const idx = viewHistory.value.lastIndexOf(view);
       if (idx >= 0) {
         viewHistory.value = viewHistory.value.slice(0, idx + 1);
-        return;
       }
+      // 回到根页面时清空详情流营期上下文
+      detailSelectedCampId.value = null;
+      return;
     }
 
     viewHistory.value.push(view);
+    // 离开详情流时清空详情营期上下文
+    if (!DETAIL_FLOW_VIEWS.includes(view)) detailSelectedCampId.value = null;
   }
 
   function goBack() {
-    if (viewHistory.value.length > 1) viewHistory.value.pop();
+    if (viewHistory.value.length > 1) {
+      viewHistory.value.pop();
+      if (!DETAIL_FLOW_VIEWS.includes(currentView.value)) detailSelectedCampId.value = null;
+    }
   }
 
   function setQuestionnaireAnswered(v: boolean) {
@@ -615,10 +628,14 @@ export const useAppStore = defineStore('app', () => {
     return camps.value.filter((c) => account.campIds!.includes(c.id));
   }
 
-  /** 获取学员当前营期（优先使用学员选中的营期，否则取第一个 active） */
+  /** 获取学员当前营期（详情流优先 detailSelectedCampId，其次全局 selectedCampId，否则取第一个 active） */
   function getStudentCamp(studentId: string): Camp | null {
     const studentCamps = getStudentCamps(studentId);
     if (studentCamps.length === 0) return null;
+    // 详情流上下文营期（学员档案内独立切换，不影响全局）优先
+    if (detailSelectedCampId.value && studentCamps.some((c) => c.id === detailSelectedCampId.value)) {
+      return studentCamps.find((c) => c.id === detailSelectedCampId.value) || null;
+    }
     // 优先使用学员选中的营期（且该营期属于此学员）
     if (selectedCampId.value && studentCamps.some((c) => c.id === selectedCampId.value)) {
       return studentCamps.find((c) => c.id === selectedCampId.value) || null;
@@ -787,6 +804,7 @@ export const useAppStore = defineStore('app', () => {
     selectedDateStr,
     rankMode,
     selectedCampId,
+    detailSelectedCampId,
     justCheckedIn,
     pendingRecordType,
     pendingRecordId,

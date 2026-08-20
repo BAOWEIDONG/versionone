@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { useAppStore } from '../store/app';
 import { NavBar, Card } from './ui';
-import { Popup as VanPopup, showToast, showConfirmDialog } from 'vant';
+import { Popup as VanPopup, showToast, showConfirmDialog, Switch as VanSwitch } from 'vant';
 import {
   Plus, Trash2, Edit3, Users, UserCircle, Dumbbell, Stethoscope,
   Phone, Search, X, Settings2, UserPlus, ShieldCheck, ShieldOff,
@@ -599,21 +599,17 @@ const switchTab = (role: Role) => {
               <div class="text-sm font-medium text-gray-700">启用状态</div>
               <div class="text-[10px] text-gray-400 mt-0.5">禁用后该手机号将无法登录</div>
             </div>
-            <button
-              type="button"
-              :class="[
-                'relative w-12 h-6 rounded-full transition-colors',
-                editingAccount.active ? 'bg-[#07C160]' : 'bg-gray-300',
-              ]"
-              @click="editingAccount.active = !editingAccount.active"
-            >
-              <span
-                :class="[
-                  'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform',
-                  editingAccount.active ? 'translate-x-6' : 'translate-x-0.5',
-                ]"
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold" :class="editingAccount.active ? 'text-[#07C160]' : 'text-gray-400'">
+                {{ editingAccount.active ? '已启用' : '已禁用' }}
+              </span>
+              <VanSwitch
+                :model-value="editingAccount.active"
+                @update:model-value="editingAccount.active = $event"
+                size="22px"
+                active-color="#07C160"
               />
-            </button>
+            </div>
           </div>
           <div v-if="accountFormError" class="text-red-500 text-xs font-medium text-center">{{ accountFormError }}</div>
         </div>

@@ -30,26 +30,26 @@ const selectedCampId = ref<string>('');
 const showCampPicker = ref(false);
 const selectedCamp = computed(() => studentCamps.value.find((c) => c.id === selectedCampId.value) || null);
 
-// 当学员切换时，自动选择其当前营期（优先使用 store.selectedCampId，确保与上游一致）
+// 当学员切换时，自动选择其当前营期（优先沿用详情流已选的营期，独立于全局 selectedCampId）
 watch(() => store.selectedStudentId, (id) => {
   if (id) {
-    if (store.selectedCampId && studentCamps.value.some((c) => c.id === store.selectedCampId)) {
-      // 上游已选营期且学员在该营期 -> 直接继承
-      selectedCampId.value = store.selectedCampId;
-    } else if (!store.selectedCampId) {
-      // 全部营期模式 -> 不选具体营期，展示全部数据（与排行榜一致）
+    if (store.detailSelectedCampId && studentCamps.value.some((c) => c.id === store.detailSelectedCampId)) {
+      // 详情流已选营期 -> 继承（不影响全局）
+      selectedCampId.value = store.detailSelectedCampId;
+    } else if (!store.detailSelectedCampId) {
+      // 全部营期模式 -> 不选具体营期，展示全部数据
       selectedCampId.value = '';
     } else {
-      // 上游选了营期但学员不在该营期 -> 回退到学员的第一个营期
+      // 详情流营期但学员不在该营期 -> 回退到学员的第一个营期
       const campId = store.getStudentCampId(id);
       if (campId) selectedCampId.value = campId;
     }
   }
 }, { immediate: true });
 
-// 本地营期切换时同步到 store，确保下游（PointsDetailView 等）继承正确营期
+// 本地营期切换时写入独立详情流上下文（不污染全局 selectedCampId），下游 PointsDetailView 等据此继承
 watch(selectedCampId, (newId) => {
-  if (newId) store.selectedCampId = newId;
+  store.detailSelectedCampId = newId || null;
 });
 
 // 按营期+学员过滤打卡记录
@@ -1348,7 +1348,7 @@ function handleDeleteManualScore(id: string) {
           <button
             v-for="camp in studentCamps"
             :key="camp.id"
-            @click="selectedCampId = camp.id; store.selectedCampId = camp.id; showCampPicker = false"
+            @click="selectedCampId = camp.id; showCampPicker = false"
             :class="[
               'w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all',
               selectedCampId === camp.id

@@ -4,7 +4,7 @@ import { useAppStore } from '../store/app';
 import { NavBar, Card } from './ui';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { Activity, Coffee, Scale, Gift, CheckCircle2, Lock, Package, Sparkles, Trophy, Check, PlayCircle } from 'lucide-vue-next';
-import { Popup as VanPopup } from 'vant';
+import { Popup as VanPopup, showToast } from 'vant';
 import { calculateStreak, getProjectedRewardDates, isRangeComplete, isDayComplete } from '../lib/streak';
 import { formatDateTime } from '../lib/utils';
 import type { ExerciseRecord } from '../types';
@@ -36,6 +36,20 @@ const campDiet = computed(() => activeCampId.value ? store.getCampDietRecords(ac
 const campEx = computed(() => activeCampId.value ? store.getCampExerciseRecords(activeCampId.value) : store.exerciseRecords);
 const campWt = computed(() => activeCampId.value ? store.getCampWeightRecords(activeCampId.value) : store.weightRecords);
 const campRewardTiers = computed(() => activeCampId.value ? store.getCampRewardTiers(activeCampId.value) : store.rewardTiers);
+
+// ─── 营期未开始：禁止打卡入口 ─────────────────────────────
+const activeCamp = computed(() => availableCamps.value.find(c => c.id === activeCampId.value) || null);
+const campNotStarted = computed(() => activeCamp.value ? !store.isCampStarted(activeCamp.value) : false);
+const campNotStartedText = computed(() => {
+  const camp = activeCamp.value;
+  if (camp?.startDate) return `营期尚未开始（${camp.startDate} 开营），暂不能打卡`;
+  return '营期尚未开始，暂不能打卡';
+});
+// 营期拦截：未开始时弹提示并返回 false
+function guardCheckin(): boolean {
+  if (campNotStarted.value) { showToast(campNotStartedText.value); return false; }
+  return true;
+}
 // 日历仅展示连续打卡奖励（source='streak'），趣味活动奖品在 CampActivitiesView 管理
 const streakRewardTiers = computed(() => campRewardTiers.value.filter(t => t.source === 'streak'));
 const campRewardClaims = computed(() => activeCampId.value ? store.getCampRewardClaims(activeCampId.value) : store.rewardClaims);
@@ -187,6 +201,7 @@ const openClaimForm = () => {
 const isSelectedToday = computed(() => isSameDay(selectedDate.value, today));
 const goCheckin = (view: 'diet' | 'exercise' | 'weight-checkin') => {
   if (!isSelectedToday.value) return;
+  if (!guardCheckin()) return; // 营期未开始时拦截
   store.setCurrentView(view);
 };
 
@@ -382,17 +397,17 @@ onMounted(() => {
           <div class="text-center text-xs text-orange-500">还有 {{ 5 - selectedStatus.completedCount }} 项未完成，继续加油！</div>
           <div class="flex gap-2">
             <button v-if="!selectedStatus.hasBreakfast || !selectedStatus.hasLunch || !selectedStatus.hasDinner"
-                    @click="store.setCurrentView('diet')"
+                    @click="goCheckin('diet')"
                     class="flex-1 py-2 rounded-lg bg-[#FF976A] text-white text-xs font-bold active:scale-95 transition-transform">
               去饮食打卡
             </button>
             <button v-if="!selectedStatus.hasExercise"
-                    @click="store.setCurrentView('exercise')"
+                    @click="goCheckin('exercise')"
                     class="flex-1 py-2 rounded-lg bg-[#07C160] text-white text-xs font-bold active:scale-95 transition-transform">
               去运动打卡
             </button>
             <button v-if="!selectedStatus.hasWeight"
-                    @click="store.setCurrentView('weight-checkin')"
+                    @click="goCheckin('weight-checkin')"
                     class="flex-1 py-2 rounded-lg bg-[#1677FF] text-white text-xs font-bold active:scale-95 transition-transform">
               去体重打卡
             </button>
