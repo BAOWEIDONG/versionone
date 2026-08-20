@@ -318,15 +318,16 @@ export const useAppStore = defineStore('app', () => {
     const current = viewHistory.value[viewHistory.value.length - 1];
     if (current === view) return;
 
-    // Tab 根页面切换：如果目标已在历史栈中，截断到该位置（模拟原生 Tab 行为）
+    // Tab 根页面切换：若目标根页已在历史栈中，截断到该位置（模拟原生 Tab 行为）；
+    // 尚未进入过历史栈时（如登录/首次切换该根页），必须 push，否则无法跳转。
     if (TAB_ROOTS.includes(view)) {
       const idx = viewHistory.value.lastIndexOf(view);
       if (idx >= 0) {
         viewHistory.value = viewHistory.value.slice(0, idx + 1);
+        // 回到根页面时清空详情流营期上下文
+        detailSelectedCampId.value = null;
+        return;
       }
-      // 回到根页面时清空详情流营期上下文
-      detailSelectedCampId.value = null;
-      return;
     }
 
     viewHistory.value.push(view);
