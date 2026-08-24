@@ -2,8 +2,7 @@
 import { ref, computed } from 'vue';
 import { useAppStore } from '../store/app';
 import { NavBar, Card } from './ui';
-import { rankStudents, rankStudentsThisWeek, getCurrentWeekRange } from '../lib/scoring';
-import { calculateDietScore, calculateExerciseScore, calculateTotalScore, calculateManualScore } from '../lib/scoring';
+import { rankStudents } from '../lib/scoring';
 import { Trophy, Download, ChevronRight, Info, RefreshCw, ChevronDown, TrendingUp, TrendingDown, Minus, Heart } from 'lucide-vue-next';
 import { Popup as VanPopup, showToast } from 'vant';
 import { format } from 'date-fns';
@@ -13,8 +12,6 @@ const highlightedId = ref<string | null>(null);
 const showRules = ref(false);
 const isRefreshing = ref(false);
 
-// 总榜 / 进步榜切换
-const rankMode = ref<'total' | 'progress'>('total');
 
 // ─── 营期选择 ───
 // 学员端：显示自己所属的营期列表（多期可切换）
@@ -78,7 +75,6 @@ const handleRefresh = () => {
 
 const rankedStudents = computed(() => {
   if (campStudents.value.length === 0) return [];
-  if (rankMode.value === 'progress') return progressRankedStudents.value;
   return rankStudents(campStudents.value, campDiet.value, campEx.value, campManual.value);
 });
 
@@ -116,52 +112,6 @@ const rankChange = (studentId: string, currentRank: number): number | null => {
   return prev - currentRank; // 正数=上升，负数=下降
 };
 
-// ---- 进步榜：本周积分 - 上周积分 ----
-const progressRankedStudents = computed(() => {
-  if (campStudents.value.length === 0) return [];
-  const { mondayStr, sundayStr } = getCurrentWeekRange();
-  // 上周日期范围
-  const lastMonday = new Date(mondayStr);
-  lastMonday.setDate(lastMonday.getDate() - 7);
-  const lastSunday = new Date(sundayStr);
-  lastSunday.setDate(lastSunday.getDate() - 7);
-  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const lm = fmt(lastMonday), ls = fmt(lastSunday);
-
-  const results = campStudents.value.map((s) => {
-    const diet = campDiet.value.filter((r) => r.studentId === s.id);
-    const ex = campEx.value.filter((r) => r.studentId === s.id);
-    const manual = campManual.value.filter((r) => r.studentId === s.id);
-    // 本周
-    const weekDiet = diet.filter((r) => { const d = r.date.substring(0, 10); return d >= mondayStr && d <= sundayStr; });
-    const weekEx = ex.filter((r) => { const d = r.date.substring(0, 10); return d >= mondayStr && d <= sundayStr; });
-    const weekManual = manual.filter((r) => r.date >= mondayStr && r.date <= sundayStr);
-    const thisWeek = calculateTotalScore(weekDiet, weekEx, weekManual);
-    // 上周
-    const lastWeekDiet = diet.filter((r) => { const d = r.date.substring(0, 10); return d >= lm && d <= ls; });
-    const lastWeekEx = ex.filter((r) => { const d = r.date.substring(0, 10); return d >= lm && d <= ls; });
-    const lastWeekManual = manual.filter((r) => r.date >= lm && r.date <= ls);
-    const lastWeek = calculateTotalScore(lastWeekDiet, lastWeekEx, lastWeekManual);
-    return {
-      studentId: s.id,
-      name: s.name,
-      thisWeek,
-      lastWeek,
-      growth: thisWeek - lastWeek,
-      totalScore: thisWeek,
-      dietScore: calculateDietScore(weekDiet),
-      exerciseScore: calculateExerciseScore(weekEx),
-      manualScore: calculateManualScore(weekManual),
-    };
-  });
-  results.sort((a, b) => b.growth - a.growth);
-  // 分配排名
-  let rank = 1;
-  return results.map((r, i) => {
-    if (i > 0 && results[i].growth < results[i - 1].growth) rank = i + 1;
-    return { ...r, rank };
-  });
-});
 
 // ---- 加油互动 ----
 const cheerKey = (toId: string) => `cheer_${store.user?.id || 'anon'}_${toId}_${todayKey}`;
@@ -222,7 +172,6 @@ const handleRowClick = (studentId: string) => {
     showToast({ message: '仅可查看自己的明细', position: 'middle', duration: 2000 });
     return;
   }
-  store.rankMode = rankMode.value;
   store.setSelectedStudentId(studentId);
   store.setCurrentView('pointsDetail');
 };
@@ -298,47 +247,20 @@ const rankNumberCls = (rank: number) =>
           </template>
           <template v-else>
             <h2 class="text-lg font-bold mb-1 leading-snug">
-              <template v-if="rankMode === 'progress'">
-                本周进步 <span class="text-white border-b border-white/60 cursor-pointer pb-0.5" @click="store.user && handleRowClick(store.user.id)">{{ (currentUserRank?.growth ?? 0) >= 0 ? '+' : '' }}{{ currentUserRank?.growth ?? 0 }}</span> 分，
-                <br />排名位于 <span @click="handleScrollToMe" class="text-white border-b border-white/60 cursor-pointer pb-0.5">{{ currentUserRank?.rank || '--' }}</span> 位
-              </template>
-              <template v-else>
-                当前我的排名位于 <span @click="handleScrollToMe" class="text-white border-b border-white/60 cursor-pointer pb-0.5">{{ currentUserRank?.rank || '--' }}</span> 位，<br />
-                总积分 <span @click="store.user && handleRowClick(store.user.id)" class="text-white border-b border-white/60 cursor-pointer pb-0.5">{{ currentUserRank?.totalScore || 0 }}</span> 分
-              </template>
+              当前我的排名位于 <span @click="handleScrollToMe" class="text-white border-b border-white/60 cursor-pointer pb-0.5">{{ currentUserRank?.rank || '--' }}</span> 位，<br />
+              总积分 <span @click="store.user && handleRowClick(store.user.id)" class="text-white border-b border-white/60 cursor-pointer pb-0.5">{{ currentUserRank?.totalScore || 0 }}</span> 分
             </h2>
-            <p class="text-xs opacity-90 mt-2">{{ rankMode === 'progress' ? '每一步进步都值得被看见' : '坚持打卡，健康生活每一天！' }}</p>
+            <p class="text-xs opacity-90 mt-2">'坚持打卡，健康生活每一天！'</p>
           </template>
         </div>
         <Trophy class="absolute right-4 -bottom-4 w-24 h-24 text-white opacity-20" />
       </div>
 
-      <div class="flex items-center justify-between -mt-3 mb-1">
-        <!-- 总榜/进步榜切换 -->
-        <div class="flex bg-gray-100 rounded-full p-1">
-          <button
-            @click="rankMode = 'total'"
-            :class="['px-4 py-1.5 rounded-full text-xs font-bold transition-all', rankMode === 'total' ? 'bg-white text-[#FF976A] shadow-sm' : 'text-gray-500']"
-          >
-            总榜
-          </button>
-          <button
-            @click="rankMode = 'progress'"
-            :class="['px-4 py-1.5 rounded-full text-xs font-bold transition-all', rankMode === 'progress' ? 'bg-white text-[#FF976A] shadow-sm' : 'text-gray-500']"
-          >
-            进步榜
-          </button>
-        </div>
+            <div class="flex items-center justify-end -mt-3 mb-1">
         <button @click="showRules = true" class="flex items-center gap-1 text-xs text-gray-500 hover:text-[#FF976A] transition-colors">
           <Info class="w-3.5 h-3.5" />
           积分规则
         </button>
-      </div>
-
-      <!-- 进步榜提示 -->
-      <div v-if="rankMode === 'progress'" class="flex items-center gap-1.5 text-xs text-[#07C160] -mt-1 mb-2 pl-1">
-        <span class="inline-block w-1 h-1 rounded-full bg-[#07C160]"></span>
-        <span>按本周积分增长量排名，进步大者居前</span>
       </div>
 
       <Card
@@ -363,8 +285,8 @@ const rankNumberCls = (rank: number) =>
           <div class="font-bold text-gray-900 flex items-center gap-2 truncate">
             <span class="truncate">{{ student.name }}</span>
             <span v-if="store.user?.id === student.studentId" class="text-[10px] bg-[#07C160] text-white px-1.5 py-0.5 rounded shrink-0">我</span>
-            <!-- 排名变动趋势（仅总榜显示） -->
-            <template v-if="rankMode === 'total'">
+            <!-- 排名变动趋势 -->
+
               <span v-if="rankChange(student.studentId, student.rank) !== null && rankChange(student.studentId, student.rank)! > 0" class="flex items-center gap-0.5 text-[10px] text-[#07C160] font-bold shrink-0">
                 <TrendingUp class="w-3 h-3" />{{ rankChange(student.studentId, student.rank) }}
               </span>
@@ -374,11 +296,6 @@ const rankNumberCls = (rank: number) =>
               <span v-else-if="rankChange(student.studentId, student.rank) === 0" class="flex items-center gap-0.5 text-[10px] text-gray-300 font-bold shrink-0">
                 <Minus class="w-3 h-3" />
               </span>
-            </template>
-          </div>
-          <!-- 进步榜显示增长量 -->
-          <div v-if="rankMode === 'progress'" class="text-xs text-gray-500 mt-0.5">
-            本周 +{{ student.thisWeek }} 分 · 上周 +{{ student.lastWeek }} 分
           </div>
           <!-- 加油次数 -->
           <div v-if="cheerCount(student.studentId) > 0" class="text-[10px] text-pink-400 flex items-center gap-0.5 mt-0.5">
@@ -401,10 +318,10 @@ const rankNumberCls = (rank: number) =>
         >
           <div class="text-right flex flex-col items-end justify-center">
             <div class="text-[22px] font-black text-[#FF976A] leading-none tracking-tighter">
-              {{ rankMode === 'progress' ? `${student.growth >= 0 ? '+' : ''}${student.growth}` : student.totalScore }}
+              {{ student.totalScore }}
             </div>
             <div class="text-[10px] text-gray-400 mt-1">
-              {{ rankMode === 'progress' ? '本周增长' : '积分详情' }}
+              积分详情
             </div>
           </div>
           <ChevronRight :class="['w-4 h-4', store.user?.role === 'dietitian' || store.user?.id === student.studentId ? 'text-gray-300' : 'text-transparent']" />

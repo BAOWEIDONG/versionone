@@ -152,8 +152,6 @@ export const useAppStore = defineStore('app', () => {
   const selectedStudentId = ref<string | null>(null);
   const selectedDateStr = ref<string | null>(null);
 
-  /** 积分排行模式：从 RankingView 传到 PointsDetailView，决定展示总榜还是周榜数据 */
-  const rankMode = ref<'total' | 'progress'>('total');
 
   /** 学员端当前选中的营期 ID（多期学员可切换；null 时自动取第一个 active 营期） */
   const selectedCampId = ref<string | null>(null);
@@ -803,7 +801,6 @@ export const useAppStore = defineStore('app', () => {
     getCampCoachActivities,
     selectedStudentId,
     selectedDateStr,
-    rankMode,
     selectedCampId,
     detailSelectedCampId,
     justCheckedIn,
