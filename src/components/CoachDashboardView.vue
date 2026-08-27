@@ -14,10 +14,10 @@ const searchQuery = ref('');
 // ─── 营期切换 ───
 const showCampPicker = ref(false);
 const coachCamps = computed(() => store.getCoachCamps());
-const activeCampId = computed(() => store.selectedCampId);
+const activeCampId = computed(() => store.selectedCampId || store.pickLatestCamp(coachCamps.value)?.id || null);
 const activeCampName = computed(() => {
-  if (!activeCampId.value) return '全部营期';
-  return coachCamps.value.find(c => c.id === activeCampId.value)?.name || '全部营期';
+  if (!activeCampId.value) return '未选择营期';
+  return coachCamps.value.find(c => c.id === activeCampId.value)?.name || '未选择营期';
 });
 
 // 按营期过滤学员
@@ -253,13 +253,6 @@ const selectCamp = (campId: string | null) => {
       <div class="p-4">
         <h3 class="font-bold text-gray-900 text-base mb-3 text-center">选择营期</h3>
         <div class="space-y-2">
-          <button
-            @click="selectCamp(null)"
-            :class="['w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all', !activeCampId ? 'border-[#07C160] bg-green-50 text-[#07C160]' : 'border-gray-200 bg-white text-gray-700 active:bg-gray-50']"
-          >
-            <span class="font-medium">全部营期</span>
-            <span class="text-xs text-gray-400">{{ store.getCoachStudents().length }}人</span>
-          </button>
           <button
             v-for="camp in coachCamps"
             :key="camp.id"

@@ -71,8 +71,8 @@ const activeCampId = computed(() => {
   if (store.selectedCampId && availableCamps.value.some(c => c.id === store.selectedCampId)) {
     return store.selectedCampId;
   }
-  const active = availableCamps.value.find(c => c.status === 'active');
-  return active?.id || availableCamps.value[0]?.id || null;
+  // 默认展示最新一期营期
+  return store.pickLatestCamp(availableCamps.value)?.id || availableCamps.value[0]?.id || null;
 });
 const activeCamp = computed(() => availableCamps.value.find(c => c.id === activeCampId.value) || null);
 const showCampSwitcher = computed(() => availableCamps.value.length > 1);

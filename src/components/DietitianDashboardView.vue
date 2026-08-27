@@ -15,16 +15,14 @@ const searchQuery = ref('');
 const showCampPicker = ref(false);
 
 const availableCamps = computed(() => store.camps);
-// 未选具体营期时回落到第一个 active 营期，避免"全部营期"跨期汇总导致多营期学员重复计分（与学员端/排名页口径一致）
+// 未选具体营期时默认展示最新一期营期（避免跨期汇总导致多营期学员重复计分）
 const activeCampId = computed(() => {
   if (store.selectedCampId) return store.selectedCampId;
-  const active = store.camps.find((c) => c.status === 'active');
-  const first = store.camps.length > 0 ? store.camps[0] : null;
-  return active?.id || first?.id || null;
+  return store.pickLatestCamp(store.camps)?.id || null;
 });
 const activeCampName = computed(() => {
-  if (!activeCampId.value) return '全部营期';
-  return store.camps.find((c) => c.id === activeCampId.value)?.name || '全部营期';
+  if (!activeCampId.value) return '未选择营期';
+  return store.camps.find((c) => c.id === activeCampId.value)?.name || '未选择营期';
 });
 
 // 按营期过滤学员（null = 全部活跃学员）
@@ -242,18 +240,6 @@ const maskPhone = (phone: string) => phone.replace(/(\d{3})\d{4}(\d{4})/, '$1***
       <div class="p-4">
         <h3 class="font-bold text-gray-900 text-base mb-3 text-center">选择营期</h3>
         <div class="space-y-2">
-          <button
-            @click="store.selectedCampId = null; showCampPicker = false"
-            :class="[
-              'w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all',
-              !activeCampId
-                ? 'border-[#FF976A] bg-orange-50 text-[#FF976A]'
-                : 'border-gray-200 bg-white text-gray-700 active:bg-gray-50',
-            ]"
-          >
-            <span class="font-medium">全部营期</span>
-            <span class="text-xs text-gray-400">{{ store.getAllStudents().length }}人</span>
-          </button>
           <button
             v-for="camp in availableCamps"
             :key="camp.id"

@@ -152,6 +152,8 @@ export const useAppStore = defineStore('app', () => {
   const selectedStudentId = ref<string | null>(null);
   const selectedDateStr = ref<string | null>(null);
 
+  /** 积分排行模式：从 RankingView 传到 PointsDetailView，决定展示总榜还是周榜数据 */
+  const rankMode = ref<'total' | 'progress'>('total');
 
   /** 学员端当前选中的营期 ID（多期学员可切换；null 时自动取第一个 active 营期） */
   const selectedCampId = ref<string | null>(null);
@@ -228,6 +230,8 @@ export const useAppStore = defineStore('app', () => {
   function setUser(u: User | null) {
     user.value = u;
     if (u) {
+      // 默认营期 = 最新一期（学员取其最新营期，教练取负责的最新营期，营养师取最新一期）
+      selectedCampId.value = defaultCampIdFor(u);
       // 持久化登录态到 localStorage，实现保活
       const authData = {
         user: u,
@@ -237,6 +241,13 @@ export const useAppStore = defineStore('app', () => {
     } else {
       localStorage.removeItem('camp_auth');
     }
+  }
+
+  /** 按角色计算默认营期（最新一期营期 = startDate 最大者） */
+  function defaultCampIdFor(u: User): string | null {
+    if (u.role === 'student') return pickLatestCamp(getStudentCamps(u.id))?.id || null;
+    if (u.role === 'coach') return pickLatestCamp(getCoachCamps())?.id || null;
+    return pickLatestCamp(camps.value)?.id || null;
   }
 
   /** 更新当前登录用户的个人信息（姓名/性别等），同步到 user + accounts + students + localStorage */
@@ -276,6 +287,8 @@ export const useAppStore = defineStore('app', () => {
       }
       if (data.user && data.user.role) {
         user.value = data.user;
+        // 默认营期 = 最新一期
+        selectedCampId.value = defaultCampIdFor(data.user);
         // 恢复问卷状态
         const qSaved = localStorage.getItem('submitted_questionnaire');
         questionnaireAnswered.value = !!qSaved;
@@ -316,16 +329,15 @@ export const useAppStore = defineStore('app', () => {
     const current = viewHistory.value[viewHistory.value.length - 1];
     if (current === view) return;
 
-    // Tab 根页面切换：若目标根页已在历史栈中，截断到该位置（模拟原生 Tab 行为）；
-    // 尚未进入过历史栈时（如登录/首次切换该根页），必须 push，否则无法跳转。
+    // Tab 根页面切换：如果目标已在历史栈中，截断到该位置（模拟原生 Tab 行为）
     if (TAB_ROOTS.includes(view)) {
       const idx = viewHistory.value.lastIndexOf(view);
       if (idx >= 0) {
         viewHistory.value = viewHistory.value.slice(0, idx + 1);
-        // 回到根页面时清空详情流营期上下文
-        detailSelectedCampId.value = null;
-        return;
       }
+      // 回到根页面时清空详情流营期上下文
+      detailSelectedCampId.value = null;
+      return;
     }
 
     viewHistory.value.push(view);
@@ -627,7 +639,17 @@ export const useAppStore = defineStore('app', () => {
     return camps.value.filter((c) => account.campIds!.includes(c.id));
   }
 
-  /** 获取学员当前营期（详情流优先 detailSelectedCampId，其次全局 selectedCampId，否则取第一个 active） */
+  /** 最新一期营期 = startDate 最大者（无日期者排最后） */
+  function pickLatestCamp(campList: Camp[]): Camp | null {
+    if (campList.length === 0) return null;
+    return campList.reduce((a, b) => {
+      const ta = a.startDate ? new Date(a.startDate).getTime() : -Infinity;
+      const tb = b.startDate ? new Date(b.startDate).getTime() : -Infinity;
+      return tb > ta ? b : a;
+    });
+  }
+
+  /** 获取学员当前营期（详情流优先 detailSelectedCampId，其次全局 selectedCampId，默认最新一期营期） */
   function getStudentCamp(studentId: string): Camp | null {
     const studentCamps = getStudentCamps(studentId);
     if (studentCamps.length === 0) return null;
@@ -639,11 +661,8 @@ export const useAppStore = defineStore('app', () => {
     if (selectedCampId.value && studentCamps.some((c) => c.id === selectedCampId.value)) {
       return studentCamps.find((c) => c.id === selectedCampId.value) || null;
     }
-    // 自动选择：优先 active，其次 ended，最后 upcoming
-    const active = studentCamps.find((c) => c.status === 'active');
-    const ended = studentCamps.find((c) => c.status === 'ended');
-    const upcoming = studentCamps.find((c) => c.status === 'upcoming');
-    return active || ended || upcoming || studentCamps[0];
+    // 默认展示最新一期营期（startDate 最大者）
+    return pickLatestCamp(studentCamps) || studentCamps[0];
   }
 
   /** 获取营期天数（从 start/end 日期计算；无日期则返回默认 28 天） */
@@ -801,6 +820,7 @@ export const useAppStore = defineStore('app', () => {
     getCampCoachActivities,
     selectedStudentId,
     selectedDateStr,
+    rankMode,
     selectedCampId,
     detailSelectedCampId,
     justCheckedIn,
@@ -882,5 +902,6 @@ export const useAppStore = defineStore('app', () => {
     getCoachStudents,
     getStudentCampId,
     getStudentCamps,
+    pickLatestCamp,
   };
 });

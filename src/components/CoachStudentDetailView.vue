@@ -27,12 +27,10 @@ watch(() => store.selectedStudentId, (id) => {
     if (store.detailSelectedCampId && studentCamps.value.some(c => c.id === store.detailSelectedCampId)) {
       // 详情流已选营期 -> 继承（不影响全局）
       selectedCampId.value = store.detailSelectedCampId;
-    } else if (!store.detailSelectedCampId) {
-      // 全部营期模式 -> 不选具体营期，展示全部数据
-      selectedCampId.value = '';
     } else {
+      // 默认展示学员最新一期营期
       const campId = store.getStudentCampId(id);
-      if (campId) selectedCampId.value = campId;
+      selectedCampId.value = campId || '';
     }
   }
 }, { immediate: true });
@@ -204,7 +202,7 @@ const openReport = (r: any) => {
       <div v-if="studentCamps.length >= 1" class="bg-white px-4 py-2.5 flex items-center justify-between rounded-xl border border-gray-100 mb-4">
         <div>
           <span class="text-xs text-gray-500">当前营期：</span>
-          <span class="text-sm font-medium text-gray-800">{{ selectedCamp?.name || '全部营期' }}</span>
+          <span class="text-sm font-medium text-gray-800">{{ selectedCamp?.name || '未选择' }}</span>
         </div>
         <button class="text-xs text-[#07C160] border border-[#07C160] px-2.5 py-1 rounded-full font-bold active:bg-green-50" @click="showCampPicker = true">
           切换
@@ -615,13 +613,6 @@ const openReport = (r: any) => {
       <div class="p-4">
         <h3 class="font-bold text-gray-900 text-base mb-3 text-center">选择营期</h3>
         <div class="space-y-2">
-          <button
-            @click="selectedCampId = ''; showCampPicker = false"
-            :class="['w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all', !selectedCampId ? 'border-[#07C160] bg-green-50 text-[#07C160]' : 'border-gray-200 bg-white text-gray-700 active:bg-gray-50']"
-          >
-            <span class="font-medium">全部营期</span>
-            <span class="text-xs text-gray-400">合并显示</span>
-          </button>
           <button
             v-for="camp in studentCamps"
             :key="camp.id"
