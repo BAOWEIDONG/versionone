@@ -142,7 +142,7 @@ const campNotStartedText = computed(() => {
   return '营期尚未开始，暂不能打卡';
 });
 // 打卡入口统一拦截：未开始时弹提示，不进入打卡页
-function guardCheckin(view: string) {
+function guardCheckin(view: 'diet' | 'exercise' | 'weight-checkin') {
   if (campNotStarted.value) {
     showToast(campNotStartedText.value);
     return;

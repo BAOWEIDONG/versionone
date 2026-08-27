@@ -334,10 +334,10 @@ export const useAppStore = defineStore('app', () => {
       const idx = viewHistory.value.lastIndexOf(view);
       if (idx >= 0) {
         viewHistory.value = viewHistory.value.slice(0, idx + 1);
+        // 回到根页面时清空详情流营期上下文
+        detailSelectedCampId.value = null;
+        return;
       }
-      // 回到根页面时清空详情流营期上下文
-      detailSelectedCampId.value = null;
-      return;
     }
 
     viewHistory.value.push(view);
