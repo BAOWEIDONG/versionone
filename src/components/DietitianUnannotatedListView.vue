@@ -42,6 +42,7 @@ const unannotatedCount = computed(() => {
 });
 
 // ─── 数据跟随首页营期（store.selectedCampId）展示，不提供独立营期切换 ───
+const currentCampName = computed(() => store.camps.find((c) => c.id === store.selectedCampId)?.name || '未选择');
 // 按营期过滤打卡记录
 const campDietRecords = computed(() => store.selectedCampId ? store.getCampDietRecords(store.selectedCampId) : store.dietRecords);
 const campWeightRecords = computed(() => store.selectedCampId ? store.getCampWeightRecords(store.selectedCampId) : store.weightRecords);
@@ -168,6 +169,12 @@ const typeConfig: Record<ItemType, { label: string; bg: string; text: string; ic
   <div class="flex min-h-full flex-col bg-[#F7F8FA] pb-24">
     <div class="pt-[calc(env(safe-area-inset-top)+1.5rem)] px-5 pb-3 bg-white">
       <h1 class="text-lg font-bold text-gray-900">待批注</h1>
+    </div>
+
+    <!-- 当前营期（只读展示，跟随首页营期，不支持切换） -->
+    <div class="bg-white px-5 py-2.5 border-t border-gray-100 flex items-center gap-1.5">
+      <span class="text-xs text-gray-500">当前营期：</span>
+      <span class="text-sm font-medium text-[#FF976A]">{{ currentCampName }}</span>
     </div>
 
     <div class="p-4 space-y-4">
