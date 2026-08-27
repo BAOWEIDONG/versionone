@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { useAppStore } from '../store/app';
 import { UserCircle, Coffee, Clock, Activity, Scale, Video, ChevronDown, FileText, Settings, Users } from 'lucide-vue-next';
-import { Popup as VanPopup, Tabbar as VanTabbar, TabbarItem as VanTabbarItem } from 'vant';
+import { Tabbar as VanTabbar, TabbarItem as VanTabbarItem } from 'vant';
 import type { DietRecord, WeightRecord } from '../types';
 
 const MEAL_TYPES = [
@@ -41,14 +41,10 @@ const unannotatedCount = computed(() => {
   return diet + weight;
 });
 
-// ─── 营期切换（与 store 同步，默认最新一期营期） ───
-const selectedCampId = ref<string | null>(store.selectedCampId || store.pickLatestCamp(store.camps)?.id || null);
-const showCampPicker = ref(false);
-const selectedCamp = computed(() => selectedCampId.value ? store.camps.find((c) => c.id === selectedCampId.value) : null);
-
+// ─── 数据跟随首页营期（store.selectedCampId）展示，不提供独立营期切换 ───
 // 按营期过滤打卡记录
-const campDietRecords = computed(() => selectedCampId.value ? store.getCampDietRecords(selectedCampId.value) : store.dietRecords);
-const campWeightRecords = computed(() => selectedCampId.value ? store.getCampWeightRecords(selectedCampId.value) : store.weightRecords);
+const campDietRecords = computed(() => store.selectedCampId ? store.getCampDietRecords(store.selectedCampId) : store.dietRecords);
+const campWeightRecords = computed(() => store.selectedCampId ? store.getCampWeightRecords(store.selectedCampId) : store.weightRecords);
 
 // 过滤标签
 const activeFilter = ref<ItemType | 'all'>('all');
@@ -148,7 +144,7 @@ function toggleAll() {
 }
 
 // 筛选/营期变化时默认展开第一个学员
-watch([activeFilter, selectedCampId], () => {
+watch(activeFilter, () => {
   if (studentGroups.value.length > 0) {
     expandedStudents.value = new Set([studentGroups.value[0].studentId]);
   } else {
@@ -157,7 +153,6 @@ watch([activeFilter, selectedCampId], () => {
 }, { immediate: true });
 
 const openRecord = (item: UnifiedItem) => {
-  store.selectedCampId = selectedCampId.value; // 同步营期到 store
   store.setSelectedStudentId(item.studentId);
   store.setPendingAnnotation(item.type, item.id);
   store.setCurrentView('dietitian-student-detail');
@@ -173,17 +168,6 @@ const typeConfig: Record<ItemType, { label: string; bg: string; text: string; ic
   <div class="flex min-h-full flex-col bg-[#F7F8FA] pb-24">
     <div class="pt-[calc(env(safe-area-inset-top)+1.5rem)] px-5 pb-3 bg-white">
       <h1 class="text-lg font-bold text-gray-900">待批注</h1>
-    </div>
-
-    <!-- 营期切换 -->
-    <div class="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100">
-      <div>
-        <div class="text-xs text-gray-500">当前营期</div>
-        <div class="text-sm font-medium text-gray-800">{{ selectedCamp?.name || '未选择' }}</div>
-      </div>
-      <button class="text-xs text-[#FF976A] border border-[#FF976A] px-3 py-1.5 rounded-full font-bold active:bg-orange-50" @click="showCampPicker = true">
-        切换营期
-      </button>
     </div>
 
     <div class="p-4 space-y-4">
@@ -291,41 +275,6 @@ const typeConfig: Record<ItemType, { label: string; bg: string; text: string; ic
         {{ activeFilter === 'all' ? '暂无待批注记录，全部已处理！' : '该类型暂无待批注记录' }}
       </div>
     </div>
-
-    <!-- 营期选择弹窗 -->
-    <VanPopup v-model:show="showCampPicker" position="bottom" round>
-      <div class="p-4">
-        <h3 class="font-bold text-gray-900 text-base mb-3 text-center">选择营期</h3>
-        <div class="space-y-2">
-          <!-- 各营期 -->
-          <button
-            v-for="camp in store.camps"
-            :key="camp.id"
-            @click="selectedCampId = camp.id; store.selectedCampId = camp.id; showCampPicker = false"
-            :class="[
-              'w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all',
-              selectedCampId === camp.id
-                ? 'border-[#FF976A] bg-orange-50 text-[#FF976A]'
-                : 'border-gray-200 bg-white text-gray-700 active:bg-gray-50',
-            ]"
-          >
-            <span class="font-medium">{{ camp.name }}</span>
-            <span
-              v-if="camp.status === 'active'"
-              class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-600"
-            >进行中</span>
-            <span
-              v-else-if="camp.status === 'ended'"
-              class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500"
-            >已结束</span>
-            <span
-              v-else
-              class="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-500"
-            >未开始</span>
-          </button>
-        </div>
-      </div>
-    </VanPopup>
 
     <!-- Bottom Nav -->
     <VanTabbar class="custom-tabbar tabbar-orange" :model-value="1">

@@ -6,6 +6,7 @@ import { MOCK_STUDENTS, MOCK_METRIC_VALUES, MOCK_STUDENT_METRIC_VALUES } from '.
 import { NavBar, Card, Button, ChartRulePopup } from './ui';
 import WeightTrendChart from './ui/WeightTrendChart.vue';
 import { UserCircle, Coffee, MessageCircle, Stethoscope, ClipboardList, AlertCircle, FileText, Activity, Scale, TrendingUp, PlayCircle, ChevronDown, ChevronUp, ThumbsUp, CheckCircle2, Salad, Eye, Plus, Minus, Trash2, Award } from 'lucide-vue-next';
+import { Popup as VanPopup } from 'vant';
 import { buildMedicalData, isValueOutOfRange, type MedicalCategory, type Indicator } from '../lib/medicalData';
 import { formatDateTime } from '../lib/utils';
 import { useDateGrouping } from '../composables/useDateGrouping';
@@ -23,18 +24,46 @@ const MEAL_TYPES = [
 const store = useAppStore();
 const student = computed(() => MOCK_STUDENTS.find((s) => s.id === store.selectedStudentId));
 
-// ─── 数据跟随首页营期（store.selectedCampId）展示，不提供独立营期切换 ───
+// ─── 营期切换（学员可能在多个营期中） ───
+const studentCamps = computed(() => store.selectedStudentId ? store.getStudentCamps(store.selectedStudentId) : []);
+const selectedCampId = ref<string>('');
+const showCampPicker = ref(false);
+const selectedCamp = computed(() => studentCamps.value.find((c) => c.id === selectedCampId.value) || null);
+
+// 当学员切换时，自动选择其当前营期（优先沿用详情流已选的营期，独立于全局 selectedCampId）
+watch(() => store.selectedStudentId, (id) => {
+  if (id) {
+    if (store.detailSelectedCampId && studentCamps.value.some((c) => c.id === store.detailSelectedCampId)) {
+      // 详情流已选营期 -> 继承（不影响全局）
+      selectedCampId.value = store.detailSelectedCampId;
+    } else if (!store.detailSelectedCampId) {
+      // 全部营期模式 -> 不选具体营期，展示全部数据
+      selectedCampId.value = '';
+    } else {
+      // 详情流营期但学员不在该营期 -> 回退到学员的第一个营期
+      const campId = store.getStudentCampId(id);
+      if (campId) selectedCampId.value = campId;
+    }
+  }
+}, { immediate: true });
+
+// 本地营期切换时写入独立详情流上下文（不污染全局 selectedCampId），下游 PointsDetailView 等据此继承
+watch(selectedCampId, (newId) => {
+  store.detailSelectedCampId = newId || null;
+});
+
+// 按营期+学员过滤打卡记录
 const campDietRecords = computed(() => {
-  if (!store.selectedCampId) return store.dietRecords;
-  return store.getCampDietRecords(store.selectedCampId);
+  if (!selectedCampId.value) return store.dietRecords;
+  return store.getCampDietRecords(selectedCampId.value);
 });
 const campExerciseRecords = computed(() => {
-  if (!store.selectedCampId) return store.exerciseRecords;
-  return store.getCampExerciseRecords(store.selectedCampId);
+  if (!selectedCampId.value) return store.exerciseRecords;
+  return store.getCampExerciseRecords(selectedCampId.value);
 });
 const campWeightRecords = computed(() => {
-  if (!store.selectedCampId) return store.weightRecords;
-  return store.getCampWeightRecords(store.selectedCampId);
+  if (!selectedCampId.value) return store.weightRecords;
+  return store.getCampWeightRecords(selectedCampId.value);
 });
 
 // 快捷回复模板
@@ -68,14 +97,14 @@ const showCampMessage = ref(false);
 const loadCampMessage = () => {
   const studentId = store.selectedStudentId;
   if (!studentId) { campMessageText.value = ''; return; }
-  // 寄语按首页营期存储，key = `${campId}_${studentId}`；通过 getCampMessage 读取
-  campMessageText.value = store.selectedCampId ? store.getCampMessage(store.selectedCampId, studentId) : '';
+  // 寄语按营期存储，key = `${campId}_${studentId}`；通过 getCampMessage 读取
+  campMessageText.value = selectedCampId.value ? store.getCampMessage(selectedCampId.value, studentId) : '';
 };
 const saveCampMessage = () => {
   const studentId = store.selectedStudentId;
   if (!studentId) return;
-  if (!store.selectedCampId) return;
-  store.setCampMessage(store.selectedCampId, studentId, campMessageText.value);
+  if (!selectedCampId.value) return;
+  store.setCampMessage(selectedCampId.value, studentId, campMessageText.value);
   campMessageSaved.value = true;
   setTimeout(() => (campMessageSaved.value = false), 2000);
 };
@@ -212,6 +241,11 @@ watch(() => student.value?.id, () => {
   loadCampMessage();
 }, { immediate: true });
 
+// 切换营期时重新加载寄语
+watch(selectedCampId, () => {
+  loadCampMessage();
+});
+
 // Questionnaire tab
 const qData = ref<any>(null);
 
@@ -322,8 +356,8 @@ const studentManualScores = computed<ManualScoreRecord[]>(() => {
   return store.manualScoreRecords
     .filter((r) => {
       if (r.studentId !== student.value!.id) return false;
-      // 与排行榜保持一致：按首页营期过滤（无 campId 的记录也纳入，兼容历史数据）
-      if (store.selectedCampId && r.campId && r.campId !== store.selectedCampId) return false;
+      // 与排行榜保持一致：按营期过滤（无 campId 的记录也纳入，兼容历史数据）
+      if (selectedCampId.value && r.campId && r.campId !== selectedCampId.value) return false;
       return true;
     })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -356,7 +390,7 @@ function handleAddManualScore() {
     dietitianName: store.user?.name || '营养师',
     createdAt: dateTimeStr,
     date: dateStr,
-    campId: store.selectedCampId || undefined,
+    campId: selectedCampId.value || undefined,
   });
   manualPoints.value = 0;
   manualReason.value = '';
@@ -401,6 +435,17 @@ function handleDeleteManualScore(id: string) {
           积分与排名
         </Button>
       </Card>
+
+      <!-- 营期切换（学员在多个营期时显示） -->
+      <div v-if="studentCamps.length > 1" class="bg-white px-4 py-2.5 flex items-center justify-between rounded-xl border border-gray-100">
+        <div>
+          <span class="text-xs text-gray-500">当前营期：</span>
+          <span class="text-sm font-medium text-gray-800">{{ selectedCamp?.name || '未选择' }}</span>
+        </div>
+        <button class="text-xs text-[#FF976A] border border-[#FF976A] px-2.5 py-1 rounded-full font-bold active:bg-orange-50" @click="showCampPicker = true">
+          切换
+        </button>
+      </div>
 
       <!-- 结营寄语 - 首期上线版暂移除，后续版本上线 -->
       <!-- <Card class="p-0 overflow-hidden border-[#07C160]/20 bg-[#07C160]/[0.03]">
@@ -1288,5 +1333,45 @@ function handleDeleteManualScore(id: string) {
       </template>
     </div>
 
+    <!-- 营期选择弹窗 -->
+    <VanPopup v-model:show="showCampPicker" position="bottom" round>
+      <div class="p-4">
+        <h3 class="font-bold text-gray-900 text-base mb-3 text-center">选择营期</h3>
+        <div class="space-y-2">
+          <button
+            @click="selectedCampId = ''; showCampPicker = false"
+            :class="['w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all', !selectedCampId ? 'border-[#FF976A] bg-orange-50 text-[#FF976A]' : 'border-gray-200 bg-white text-gray-700 active:bg-gray-50']"
+          >
+            <span class="font-medium">全部营期</span>
+            <span class="text-xs text-gray-400">合并显示</span>
+          </button>
+          <button
+            v-for="camp in studentCamps"
+            :key="camp.id"
+            @click="selectedCampId = camp.id; showCampPicker = false"
+            :class="[
+              'w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all',
+              selectedCampId === camp.id
+                ? 'border-[#FF976A] bg-orange-50 text-[#FF976A]'
+                : 'border-gray-200 bg-white text-gray-700 active:bg-gray-50',
+            ]"
+          >
+            <span class="font-medium">{{ camp.name }}</span>
+            <span
+              v-if="camp.status === 'active'"
+              class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-600"
+            >进行中</span>
+            <span
+              v-else-if="camp.status === 'ended'"
+              class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500"
+            >已结束</span>
+            <span
+              v-else
+              class="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-500"
+            >未开始</span>
+          </button>
+        </div>
+      </div>
+    </VanPopup>
   </div>
 </template>
