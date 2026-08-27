@@ -15,10 +15,11 @@ const searchQuery = ref('');
 const showCampPicker = ref(false);
 
 const availableCamps = computed(() => store.camps);
-// 未选具体营期时默认展示最新一期营期（避免跨期汇总导致多营期学员重复计分）
+// 未选具体营期时默认展示最新一期"已开营"营期（进行中优先；未开营不展示，避免空数据）
 const activeCampId = computed(() => {
   if (store.selectedCampId) return store.selectedCampId;
-  return store.pickLatestCamp(store.camps)?.id || null;
+  const opened = store.camps.filter((c) => c.status !== 'upcoming');
+  return store.pickLatestCamp(opened)?.id || null;
 });
 const activeCampName = computed(() => {
   if (!activeCampId.value) return '未选择营期';

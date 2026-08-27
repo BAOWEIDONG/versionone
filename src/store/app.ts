@@ -243,11 +243,13 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  /** 按角色计算默认营期（最新一期营期 = startDate 最大者） */
+  /** 按角色计算默认营期（最新一期营期 = startDate 最大者；营养师只取已开营营期） */
   function defaultCampIdFor(u: User): string | null {
     if (u.role === 'student') return pickLatestCamp(getStudentCamps(u.id))?.id || null;
     if (u.role === 'coach') return pickLatestCamp(getCoachCamps())?.id || null;
-    return pickLatestCamp(camps.value)?.id || null;
+    // 营养师：默认展示最新一期"已开营"营期（进行中优先；未开营不展示）
+    const opened = camps.value.filter((c) => c.status !== 'upcoming');
+    return pickLatestCamp(opened)?.id || null;
   }
 
   /** 更新当前登录用户的个人信息（姓名/性别等），同步到 user + accounts + students + localStorage */
