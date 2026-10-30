@@ -6,7 +6,6 @@ import { Trophy, TrendingDown, TrendingUp, Activity, Target, Flame, Heart, Award
 import { Tabbar as VanTabbar, TabbarItem as VanTabbarItem, Popup as VanPopup } from 'vant';
 import { MOCK_STUDENT_METRIC_VALUES } from '../mock/data';
 import { generateStudentReport, weightTrendToSvgPoints } from '../lib/campReport';
-import { computeWeightMilestones } from '../lib/campActivities';
 import { exportElementAsImage } from '../lib/exportImage';
 import type { StudentCampReport, MetricChange, Achievement } from '../types';
 
@@ -123,22 +122,31 @@ const labMetrics = computed(() =>
     }),
 );
 
-// 徽章墙：里程碑徽章 + 成就徽章（与「我的徽章」同一套口径）
+// 徽章墙：直接读取营养师配置的徽章（里程碑 + 成就），与「我的徽章」同一套数据
 const badgeWall = computed(() => {
-  const weights = campWeightRecords.value
-    .filter((r) => !r.studentId || r.studentId === studentId.value)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const start = weights.length ? weights[0].weight : null;
-  const milestones = computeWeightMilestones(weights, start).map((m) => ({
-    id: m.id,
-    title: `减重 ${Math.round(m.threshold * 100)}% 里程碑`,
-    description: m.achieved ? '已达成' : `当前进度 ${Math.round(m.progress * 100)}%`,
-    icon: '🎯',
-    unlocked: m.achieved,
-  }));
-  return [...milestones, ...report.value.achievements];
+  const cid = selectedCampId.value || campInfo.value?.id;
+  if (!cid || !store.user) return [];
+  const list = store.getStudentBadges(store.user.id, cid);
+  const earnedIds = new Set(list.map((b) => b.badgeId));
+  return store
+    .getBadgeConfigs(cid)
+    .filter((c) => c.category !== 'activity' && c.active !== false)
+    .map((c) => ({
+      id: c.id,
+      title: c.name,
+      description: c.description || '',
+      icon: c.icon,
+      unlocked: earnedIds.has(c.id),
+    }));
 });
 const unlockedAchievements = computed(() => badgeWall.value.filter((a) => a.unlocked));
+
+// 进入报告时按当前配置同步一次徽章
+watch(
+  () => campInfo.value?.id,
+  (cid) => { if (cid) store.syncBadges(cid); },
+  { immediate: true },
+);
 
 // 营养师结营寄语（按营期存储，key = `${campId}_${studentId}`）
 const campMessage = computed(() => {

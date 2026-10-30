@@ -1,5 +1,5 @@
 import { eachDayOfInterval, format, isValid, startOfWeek } from 'date-fns';
-import type { BadgeConfig, BadgeRecord, Camp, DietRecord, ExerciseRecord, WeightRecord } from '../types';
+import type { BadgeCondition, BadgeConfig, BadgeRecord, Camp, DietRecord, ExerciseRecord, WeightRecord } from '../types';
 
 interface StudentLike { id: string }
 
@@ -58,7 +58,7 @@ export function computeBadgeRecords(
 ): BadgeRecord[] {
   const days = campDateKeys(camp);
   if (!camp || days.length === 0) return [];
-  const active = configs.filter((c) => c.active !== false);
+  const active = configs.filter((c) => c.active !== false && (c.category ?? 'activity') === 'activity');
   const out: BadgeRecord[] = [];
 
   for (const cfg of active) {
@@ -87,6 +87,7 @@ export function computeBadgeRecords(
           campId: camp.id,
           badgeId: cfg.id,
           badgeName: cfg.name,
+          category: 'activity',
           cadence: cfg.cadence,
           icon: cfg.icon,
           periodKey,
@@ -97,4 +98,75 @@ export function computeBadgeRecords(
     }
   }
   return out;
+}
+
+/** 一次性徽章判定上下文（里程碑 / 成就） */
+export interface OneTimeBadgeContext {
+  longestStreak: number;
+  /** 体重下降（正数=减重） */
+  weightLossKg: number | null;
+  /** 体重下降百分比（正数=减重） */
+  weightLossPercent: number | null;
+  /** 脂肪量下降（正数=减脂） */
+  fatLossKg: number | null;
+  exerciseRecords: ExerciseRecord[];
+  earnedAt: string;
+}
+
+/** 按配置的条件类型判定一次性徽章是否达成 */
+export function evaluateOneTimeCondition(
+  condition: BadgeCondition,
+  threshold: number,
+  ctx: OneTimeBadgeContext,
+): boolean {
+  const t = Number(threshold) || 0;
+  switch (condition) {
+    case 'streak_days':
+      return ctx.longestStreak >= t;
+    case 'weight_loss_kg':
+      return (ctx.weightLossKg ?? 0) >= t;
+    case 'weight_loss_percent':
+      return (ctx.weightLossPercent ?? 0) >= t;
+    case 'fat_loss_kg':
+      return (ctx.fatLossKg ?? 0) >= t;
+    case 'early_exercise_count':
+      return ctx.exerciseRecords.filter((r) => {
+        const time = r.date.split(' ')[1] || '';
+        return time >= '05:00' && time < '09:00';
+      }).length >= t;
+    case 'single_exercise_minutes':
+      return ctx.exerciseRecords.some((r) => r.duration >= t);
+    case 'max_intensity':
+      return ctx.exerciseRecords.some((r) => r.intensity >= t);
+    case 'exercise_type_count':
+      return new Set(ctx.exerciseRecords.map((r) => r.type)).size >= t;
+    default:
+      // 周期类条件（checkin_days / all_items）不适用于一次性徽章
+      return false;
+  }
+}
+
+/** 计算某学员的一次性徽章（里程碑 + 成就） */
+export function computeOneTimeBadgeRecords(
+  configs: BadgeConfig[],
+  studentId: string,
+  campId: string,
+  ctx: OneTimeBadgeContext,
+): BadgeRecord[] {
+  return configs
+    .filter((c) => c.active !== false && c.category !== 'activity')
+    .filter((c) => evaluateOneTimeCondition(c.condition, c.threshold, ctx))
+    .map((c) => ({
+      id: `${studentId}_${c.id}_once`,
+      studentId,
+      campId,
+      badgeId: c.id,
+      badgeName: c.name,
+      category: c.category,
+      cadence: c.cadence,
+      icon: c.icon,
+      periodKey: 'once',
+      earnedAt: ctx.earnedAt,
+      value: c.threshold,
+    }));
 }

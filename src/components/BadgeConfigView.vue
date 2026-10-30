@@ -2,9 +2,9 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useAppStore } from '../store/app';
 import { NavBar, Card, Button } from './ui';
-import { Award, Download, Pencil, Plus, Trash2, X, Search } from 'lucide-vue-next';
+import { Download, Pencil, Plus, Trash2, X, Search } from 'lucide-vue-next';
 import { Popup as VanPopup, showToast } from 'vant';
-import type { BadgeConfig, BadgeCadence, BadgeCondition } from '../types';
+import type { BadgeConfig, BadgeCadence, BadgeCategory, BadgeCondition } from '../types';
 
 const store = useAppStore();
 
@@ -26,54 +26,89 @@ onMounted(() => {
   if (campId.value) store.syncBadges(campId.value);
 });
 
+const CATEGORY_LABEL: Record<BadgeCategory, string> = { milestone: '里程碑', achievement: '成就', activity: '活动' };
+const CADENCE_LABEL: Record<BadgeCadence, string> = { day: '每日', week: '每周', month: '每月' };
+const COND_META: Record<BadgeCondition, { label: string; unit: string }> = {
+  checkin_days: { label: '有打卡天数', unit: '天' },
+  all_items: { label: '全项完成天数', unit: '天' },
+  streak_days: { label: '最长连续打卡', unit: '天' },
+  weight_loss_kg: { label: '体重下降', unit: 'kg' },
+  weight_loss_percent: { label: '体重下降', unit: '%' },
+  fat_loss_kg: { label: '脂肪下降', unit: 'kg' },
+  early_exercise_count: { label: '早9点前运动', unit: '次' },
+  single_exercise_minutes: { label: '单次运动', unit: '分钟' },
+  max_intensity: { label: '运动强度达到', unit: '级' },
+  exercise_type_count: { label: '运动种类', unit: '种' },
+};
+const CONDITIONS_BY_CATEGORY: Record<BadgeCategory, BadgeCondition[]> = {
+  milestone: ['weight_loss_percent'],
+  achievement: ['streak_days', 'weight_loss_kg', 'fat_loss_kg', 'early_exercise_count', 'single_exercise_minutes', 'max_intensity', 'exercise_type_count'],
+  activity: ['checkin_days', 'all_items'],
+};
+const conditionsOf = (c: BadgeCategory) => CONDITIONS_BY_CATEGORY[c];
+
+// ─── 列表筛选 ───
+const configFilter = ref<'all' | BadgeCategory>('all');
+const filteredConfigs = computed(() => (configFilter.value === 'all' ? configs.value : configs.value.filter((c) => c.category === configFilter.value)));
+
 // ─── 编辑配置 ───
 const showEditor = ref(false);
-const form = reactive<BadgeConfig>({ id: '', campId: '', name: '', cadence: 'day', condition: 'checkin_days', threshold: 1, icon: '🎖️', description: '', active: true });
+const isNew = ref(false);
+const form = reactive<BadgeConfig>({ id: '', campId: '', category: 'activity', name: '', cadence: 'day', condition: 'checkin_days', threshold: 1, icon: '🎖️', description: '', active: true });
 
 const openNew = () => {
-  Object.assign(form, { id: `b_${Date.now()}`, campId: campId.value || '', name: '', cadence: 'day', condition: 'checkin_days', threshold: 1, icon: '🎖️', description: '', active: true });
+  Object.assign(form, { id: `b_${Date.now()}`, campId: campId.value || '', category: 'activity', name: '', cadence: 'day', condition: 'checkin_days', threshold: 1, icon: '🎖️', description: '', active: true });
+  isNew.value = true;
   showEditor.value = true;
 };
 const openEdit = (c: BadgeConfig) => {
   Object.assign(form, { ...c });
+  isNew.value = false;
   showEditor.value = true;
+};
+const switchCategory = (cat: BadgeCategory) => {
+  form.category = cat;
+  form.condition = CONDITIONS_BY_CATEGORY[cat][0];
+  if (cat !== 'activity') form.cadence = 'day';
 };
 const save = () => {
   if (!campId.value) return;
   if (!form.name.trim()) { showToast('请填写徽章名称'); return; }
-  store.upsertBadgeConfig(campId.value, { ...form, name: form.name.trim(), campId: campId.value, threshold: Math.max(1, Number(form.threshold) || 1) });
+  store.upsertBadgeConfig(campId.value, { ...form, name: form.name.trim(), campId: campId.value, threshold: Math.max(0.1, Number(form.threshold) || 1) });
+  store.syncBadges(campId.value);
   showEditor.value = false;
   showToast('已保存');
 };
 const toggle = (c: BadgeConfig) => {
   if (!campId.value) return;
   store.upsertBadgeConfig(campId.value, { ...c, active: !c.active });
+  store.syncBadges(campId.value);
 };
 const remove = (c: BadgeConfig) => {
   if (!campId.value) return;
   if (!window.confirm(`删除徽章「${c.name}」？历史获得记录会保留。`)) return;
   store.deleteBadgeConfig(campId.value, c.id);
+  store.syncBadges(campId.value);
 };
 
-const cadenceLabel = (c: BadgeCadence) => (c === 'day' ? '每日' : c === 'week' ? '每周' : '每月');
-const condLabel = (c: BadgeCondition) => (c === 'all_items' ? '全项完成' : '有打卡');
+const condText = (c: BadgeConfig) => `${COND_META[c.condition]?.label || c.condition} ≥ ${c.threshold} ${COND_META[c.condition]?.unit || ''}`;
 
 // ─── 记录筛选 + 导出 ───
-const recordFilter = ref<'all' | BadgeCadence>('all');
+const recordFilter = ref<'all' | BadgeCategory>('all');
 const keyword = ref('');
 const filteredRecords = computed(() => {
   let list = records.value;
-  if (recordFilter.value !== 'all') list = list.filter((r) => r.cadence === recordFilter.value);
+  if (recordFilter.value !== 'all') list = list.filter((r) => r.category === recordFilter.value);
   const k = keyword.value.trim().toLowerCase();
   if (k) list = list.filter((r) => nameOf(r.studentId).toLowerCase().includes(k) || phoneOf(r.studentId).includes(keyword.value.trim()));
   return [...list].sort((a, b) => b.earnedAt.localeCompare(a.earnedAt));
 });
 
 const exportCsv = () => {
-  const header = ['学员', '手机号', '营期', '徽章', '类型', '周期', '获得时间', '达成天数'];
+  const header = ['学员', '手机号', '营期', '徽章', '分类', '周期', '获得时间', '达成值'];
   const lines = filteredRecords.value.map((r) => [
     nameOf(r.studentId), phoneOf(r.studentId), camp.value?.name || '', r.badgeName,
-    cadenceLabel(r.cadence), r.periodKey, r.earnedAt, String(r.value),
+    CATEGORY_LABEL[r.category], r.periodKey === 'once' ? '一次性' : r.periodKey, r.earnedAt, String(r.value),
   ]);
   const csv = [header, ...lines].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -102,25 +137,35 @@ const exportCsv = () => {
 
     <div class="p-4 space-y-4">
       <div class="flex bg-gray-100 p-1 rounded-xl">
-        <button :class="['flex-1 py-2 text-sm font-bold rounded-lg', tab === 'config' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500']" @click="tab = 'config'">活动与徽章</button>
+        <button :class="['flex-1 py-2 text-sm font-bold rounded-lg', tab === 'config' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500']" @click="tab = 'config'">徽章配置</button>
         <button :class="['flex-1 py-2 text-sm font-bold rounded-lg', tab === 'records' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500']" @click="tab = 'records'">获得记录</button>
       </div>
 
       <!-- 配置 -->
       <template v-if="tab === 'config'">
         <Button class="w-full bg-[#FF976A] text-white" @click="openNew">
-          <Plus class="w-4 h-4 mr-1" /> 新增徽章活动
+          <Plus class="w-4 h-4 mr-1" /> 新增徽章
         </Button>
-        <Card v-for="c in configs" :key="c.id" class="p-4">
+
+        <div class="flex gap-1.5 overflow-x-auto no-scrollbar">
+          <button v-for="t in [{ k: 'all', l: '全部' }, { k: 'milestone', l: '里程碑' }, { k: 'achievement', l: '成就' }, { k: 'activity', l: '活动' }]" :key="t.k"
+            @click="configFilter = t.k as any"
+            :class="['px-3 py-1.5 rounded-full text-xs font-bold shrink-0', configFilter === t.k ? 'bg-[#FF976A] text-white' : 'bg-gray-100 text-gray-600']">
+            {{ t.l }}
+          </button>
+        </div>
+
+        <Card v-for="c in filteredConfigs" :key="c.id" class="p-4">
           <div class="flex items-start gap-3">
             <div class="w-11 h-11 rounded-full bg-orange-50 flex items-center justify-center text-2xl shrink-0">{{ c.icon }}</div>
             <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-sm font-bold text-gray-900 truncate">{{ c.name }}</span>
+                <span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-[#1677FF]/10 text-[#1677FF]">{{ CATEGORY_LABEL[c.category] }}</span>
                 <span :class="['text-[9px] px-1.5 py-0.5 rounded-full font-bold', c.active ? 'bg-[#07C160]/10 text-[#07C160]' : 'bg-gray-100 text-gray-400']">{{ c.active ? '已启用' : '已停用' }}</span>
               </div>
               <div class="text-[11px] text-gray-500 mt-0.5">
-                {{ cadenceLabel(c.cadence) }} · {{ condLabel(c.condition) }} ≥ {{ c.threshold }} 天
+                <template v-if="c.category === 'activity'">{{ CADENCE_LABEL[c.cadence] }} · </template>{{ condText(c) }}
               </div>
               <div v-if="c.description" class="text-[10px] text-gray-400 mt-0.5 truncate">{{ c.description }}</div>
             </div>
@@ -130,21 +175,21 @@ const exportCsv = () => {
             </div>
           </div>
           <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
-            <span class="text-[11px] text-gray-400">共 {{ records.filter(r => r.badgeId === c.id).length }} 枚已发出</span>
+            <span class="text-[11px] text-gray-400">共 {{ records.filter(r => r.badgeId === c.id).length }} 枚已被学员获得</span>
             <button :class="['text-[11px] font-bold px-3 py-1 rounded-full', c.active ? 'bg-gray-100 text-gray-600' : 'bg-[#07C160]/10 text-[#07C160]']" @click="toggle(c)">
               {{ c.active ? '停用' : '启用' }}
             </button>
           </div>
         </Card>
-        <div v-if="configs.length === 0" class="text-center text-xs text-gray-400 py-6">暂无徽章活动，点击上方新增</div>
+        <div v-if="filteredConfigs.length === 0" class="text-center text-xs text-gray-400 py-6">暂无徽章，点击上方新增</div>
       </template>
 
       <!-- 记录 -->
       <template v-else>
-        <div class="flex gap-1.5">
-          <button v-for="t in [{ k: 'all', l: '全部' }, { k: 'day', l: '每日' }, { k: 'week', l: '每周' }, { k: 'month', l: '每月' }]" :key="t.k"
+        <div class="flex gap-1.5 overflow-x-auto no-scrollbar">
+          <button v-for="t in [{ k: 'all', l: '全部' }, { k: 'milestone', l: '里程碑' }, { k: 'achievement', l: '成就' }, { k: 'activity', l: '活动' }]" :key="t.k"
             @click="recordFilter = t.k as any"
-            :class="['px-3 py-1.5 rounded-full text-xs font-bold', recordFilter === t.k ? 'bg-[#FF976A] text-white' : 'bg-gray-100 text-gray-600']">
+            :class="['px-3 py-1.5 rounded-full text-xs font-bold shrink-0', recordFilter === t.k ? 'bg-[#FF976A] text-white' : 'bg-gray-100 text-gray-600']">
             {{ t.l }}
           </button>
         </div>
@@ -157,7 +202,7 @@ const exportCsv = () => {
             <div class="w-9 h-9 rounded-full bg-orange-50 flex items-center justify-center text-xl shrink-0">{{ r.icon }}</div>
             <div class="flex-1 min-w-0">
               <div class="text-xs font-bold text-gray-900">{{ nameOf(r.studentId) }} · {{ r.badgeName }}</div>
-              <div class="text-[10px] text-gray-400">{{ cadenceLabel(r.cadence) }} · {{ r.periodKey }} · 达成 {{ r.value }} 天</div>
+              <div class="text-[10px] text-gray-400">{{ CATEGORY_LABEL[r.category] }} · {{ r.periodKey === 'once' ? '一次性' : r.periodKey }} · 达成 {{ r.value }}</div>
             </div>
             <span class="text-[10px] text-gray-500 shrink-0">{{ r.earnedAt }}</span>
           </div>
@@ -169,21 +214,34 @@ const exportCsv = () => {
 
     <!-- 编辑弹窗 -->
     <VanPopup v-model:show="showEditor" position="bottom" round>
-      <div class="p-4 space-y-3">
+      <div class="p-4 space-y-3 max-h-[85vh] overflow-y-auto">
         <div class="flex items-center justify-between">
-          <h3 class="font-bold text-gray-900">{{ form.id.startsWith('b_') && configs.some(c => c.id === form.id) ? '编辑徽章' : '新增徽章' }}</h3>
+          <h3 class="font-bold text-gray-900">{{ isNew ? '新增徽章' : '编辑徽章' }}</h3>
           <button @click="showEditor = false" class="p-1 text-gray-400"><X class="w-5 h-5" /></button>
         </div>
+
+        <div>
+          <label class="text-xs text-gray-500">分类</label>
+          <div class="flex gap-1.5 mt-1">
+            <button v-for="c in [{ k: 'milestone', l: '里程碑' }, { k: 'achievement', l: '成就' }, { k: 'activity', l: '活动' }]" :key="c.k"
+              @click="switchCategory(c.k as BadgeCategory)"
+              :class="['flex-1 py-2 rounded-xl text-xs font-bold', form.category === c.k ? 'bg-[#FF976A] text-white' : 'bg-gray-100 text-gray-600']">
+              {{ c.l }}
+            </button>
+          </div>
+        </div>
+
         <div>
           <label class="text-xs text-gray-500">徽章名称</label>
-          <input v-model="form.name" placeholder="如：本周满勤" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+          <input v-model="form.name" placeholder="如：本周满勤 / 连续 7 天" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
         </div>
+
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="text-xs text-gray-500">图标（emoji）</label>
             <input v-model="form.icon" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
           </div>
-          <div>
+          <div v-if="form.category === 'activity'">
             <label class="text-xs text-gray-500">周期</label>
             <select v-model="form.cadence" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white">
               <option value="day">每日</option>
@@ -192,25 +250,32 @@ const exportCsv = () => {
             </select>
           </div>
         </div>
+
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="text-xs text-gray-500">达成条件</label>
             <select v-model="form.condition" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white">
-              <option value="checkin_days">有打卡</option>
-              <option value="all_items">全项完成</option>
+              <option v-for="c in conditionsOf(form.category)" :key="c" :value="c">{{ COND_META[c].label }}</option>
             </select>
           </div>
           <div>
-            <label class="text-xs text-gray-500">达成天数</label>
-            <input v-model.number="form.threshold" type="number" min="1" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+            <label class="text-xs text-gray-500">达成值（{{ COND_META[form.condition]?.unit }}）</label>
+            <input v-model.number="form.threshold" type="number" min="0.1" step="0.1" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
           </div>
         </div>
+
         <div>
           <label class="text-xs text-gray-500">说明（可选）</label>
           <input v-model="form.description" placeholder="如：一周内打卡满 3 天" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
         </div>
+
         <Button class="w-full bg-[#FF976A] text-white" @click="save">保存</Button>
       </div>
     </VanPopup>
   </div>
 </template>
+
+<style scoped>
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>

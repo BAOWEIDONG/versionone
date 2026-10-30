@@ -17,10 +17,12 @@ import {
   MOCK_POINT_PRODUCTS,
   MOCK_POINT_EXCHANGES,
   MOCK_MANUAL_SCORES,
+  MOCK_STUDENT_METRIC_VALUES,
 } from '../mock/data';
 import * as api from '../lib/api';
 import { calculateTotalScore } from '../lib/scoring';
-import { computeBadgeRecords } from '../lib/badges';
+import { computeBadgeRecords, computeOneTimeBadgeRecords } from '../lib/badges';
+import { generateStudentReport } from '../lib/campReport';
 
 /** 生成 yyyy-MM-dd HH:mm:ss 格式的当前时间字符串（全站统一格式） */
 function formatDateTimeStr(): string {
@@ -88,13 +90,29 @@ export interface ActivityConfig {
   weeklyChallengeWeeks?: number;
 }
 
-/** 新营期默认徽章：日/周/月三档 + 全项达标，营养师可自行增删改 */
+/** 新营期默认徽章：里程碑 / 成就 / 活动三类，全部可在营养师端增删改 */
 function defaultBadges(campId: string): BadgeConfig[] {
+  const base = { campId, active: true };
   return [
-    { id: 'b_day', campId, name: '每日打卡', cadence: 'day', condition: 'checkin_days', threshold: 1, icon: '🌱', description: '每天完成任意一项打卡即获得', active: true },
-    { id: 'b_all', campId, name: '全项达标', cadence: 'day', condition: 'all_items', threshold: 1, icon: '✅', description: '当天早、中、晚、运动、体重全部完成', active: true },
-    { id: 'b_week', campId, name: '本周坚持', cadence: 'week', condition: 'checkin_days', threshold: 3, icon: '🏅', description: '一周内打卡满 3 天', active: true },
-    { id: 'b_month', campId, name: '月度坚持', cadence: 'month', condition: 'checkin_days', threshold: 5, icon: '🏆', description: '一个月内打卡满 5 天', active: true },
+    // 里程碑（一次性，减重 %）
+    { ...base, id: 'm_3', category: 'milestone', name: '减重 3% 里程碑', cadence: 'day', condition: 'weight_loss_percent', threshold: 3, icon: '🎯', description: '体重较开营下降 3%' },
+    { ...base, id: 'm_5', category: 'milestone', name: '减重 5% 里程碑', cadence: 'day', condition: 'weight_loss_percent', threshold: 5, icon: '🎯', description: '体重较开营下降 5%' },
+    // 成就（一次性）
+    { ...base, id: 'a_streak7', category: 'achievement', name: '连续打卡 7 天', cadence: 'day', condition: 'streak_days', threshold: 7, icon: '🏆', description: '最长连续全项打卡满 7 天' },
+    { ...base, id: 'a_streak14', category: 'achievement', name: '连续打卡 14 天', cadence: 'day', condition: 'streak_days', threshold: 14, icon: '🔥', description: '最长连续全项打卡满 14 天' },
+    { ...base, id: 'a_streak28', category: 'achievement', name: '全勤先锋', cadence: 'day', condition: 'streak_days', threshold: 28, icon: '🏅', description: '最长连续全项打卡满 28 天' },
+    { ...base, id: 'a_wl3', category: 'achievement', name: '减重 3kg', cadence: 'day', condition: 'weight_loss_kg', threshold: 3, icon: '⚖️', description: '体重下降达到 3kg' },
+    { ...base, id: 'a_wl5', category: 'achievement', name: '减重 5kg', cadence: 'day', condition: 'weight_loss_kg', threshold: 5, icon: '👑', description: '体重下降达到 5kg' },
+    { ...base, id: 'a_fat2', category: 'achievement', name: '燃脂勇士', cadence: 'day', condition: 'fat_loss_kg', threshold: 2, icon: '🔥', description: '脂肪量下降达到 2kg' },
+    { ...base, id: 'a_early3', category: 'achievement', name: '晨型人', cadence: 'day', condition: 'early_exercise_count', threshold: 3, icon: '🌅', description: '早 9 点前完成运动满 3 次' },
+    { ...base, id: 'a_endurance60', category: 'achievement', name: '耐力王', cadence: 'day', condition: 'single_exercise_minutes', threshold: 60, icon: '🏅', description: '单次运动达到 60 分钟' },
+    { ...base, id: 'a_intensity5', category: 'achievement', name: '极限挑战', cadence: 'day', condition: 'max_intensity', threshold: 5, icon: '⚡', description: '完成一次 Lv.5 高强度运动' },
+    { ...base, id: 'a_types3', category: 'achievement', name: '运动多面手', cadence: 'day', condition: 'exercise_type_count', threshold: 3, icon: '🎽', description: '尝试 3 种以上运动' },
+    // 活动（周期性，可重复）
+    { ...base, id: 'b_day', category: 'activity', name: '每日打卡', cadence: 'day', condition: 'checkin_days', threshold: 1, icon: '🌱', description: '每天完成任意一项打卡即获得' },
+    { ...base, id: 'b_all', category: 'activity', name: '全项达标', cadence: 'day', condition: 'all_items', threshold: 1, icon: '✅', description: '当天早、中、晚、运动、体重全部完成' },
+    { ...base, id: 'b_week', category: 'activity', name: '本周坚持', cadence: 'week', condition: 'checkin_days', threshold: 3, icon: '🏅', description: '一周内打卡满 3 天' },
+    { ...base, id: 'b_month', category: 'activity', name: '月度坚持', cadence: 'month', condition: 'checkin_days', threshold: 5, icon: '🏆', description: '一个月内打卡满 5 天' },
   ];
 }
 
@@ -162,21 +180,51 @@ export const useAppStore = defineStore('app', () => {
     setBadgeConfigs(campId, getBadgeConfigs(campId).filter((x) => x.id !== id));
   }
 
-  /** 按当前打卡数据重算徽章并合并（id 幂等，不重复记） */
+  /** 按当前打卡数据与配置重算徽章（活动徽章幂等追加；一次性徽章按配置重建） */
   function syncBadges(campId: string) {
     const camp = camps.value.find((c) => c.id === campId);
     if (!camp) return;
-    const computed = computeBadgeRecords(
-      getBadgeConfigs(campId),
-      getStudentsByCamp(campId),
-      dietRecords.value.filter((r) => r.campId === campId),
-      exerciseRecords.value.filter((r) => r.campId === campId),
-      weightRecords.value.filter((r) => r.campId === campId),
-      camp,
-    );
-    const existing = new Set(badgeRecords.value.map((r) => r.id));
-    const fresh = computed.filter((r) => !existing.has(r.id));
-    if (fresh.length) badgeRecords.value = [...badgeRecords.value, ...fresh];
+    const configs = getBadgeConfigs(campId);
+    const studentList = getStudentsByCamp(campId);
+    const diet = dietRecords.value.filter((r) => r.campId === campId);
+    const ex = exerciseRecords.value.filter((r) => r.campId === campId);
+    const wt = weightRecords.value.filter((r) => r.campId === campId);
+
+    // 活动徽章（周期、可重复）
+    const activity = computeBadgeRecords(configs, studentList, diet, ex, wt, camp);
+
+    // 一次性徽章（里程碑 + 成就）：每次按最新配置重建
+    const campDays = camp.startDate && camp.endDate
+      ? Math.max(1, Math.round((new Date(camp.endDate).getTime() - new Date(camp.startDate).getTime()) / 86400000))
+      : 28;
+    const today = formatDateTimeStr().substring(0, 10);
+    const oneTime = studentList.flatMap((s) => {
+      const sd = diet.filter((r) => r.studentId === s.id);
+      const se = ex.filter((r) => r.studentId === s.id);
+      const sw = wt.filter((r) => r.studentId === s.id);
+      const report = generateStudentReport(
+        { id: s.id, name: s.name, gender: s.gender },
+        metricConfigs.value,
+        MOCK_STUDENT_METRIC_VALUES[s.id] || {},
+        sd,
+        se,
+        sw,
+        campDays,
+      );
+      return computeOneTimeBadgeRecords(configs, s.id, campId, {
+        longestStreak: report.checkinStats.longestStreak,
+        weightLossKg: report.summary.weightLossKg,
+        weightLossPercent: report.summary.weightLossPercent,
+        fatLossKg: report.summary.bodyFatLossKg,
+        exerciseRecords: se,
+        earnedAt: today,
+      });
+    });
+
+    const keptActivity = badgeRecords.value.filter((r) => !(r.campId === campId && r.periodKey === 'once'));
+    const existing = new Set(keptActivity.map((r) => r.id));
+    const freshActivity = activity.filter((r) => !existing.has(r.id));
+    badgeRecords.value = [...keptActivity, ...freshActivity, ...oneTime];
   }
 
   function getCampBadgeRecords(campId: string): BadgeRecord[] {

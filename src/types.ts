@@ -481,25 +481,53 @@ export interface MetricAggregate {
 //  趣味活动 · 徽章（本期不接商城/领取/发放，仅记录与导出）
 // ============================================================================
 
-/** 徽章周期：按天 / 按周 / 按月 */
+/** 徽章周期：按天 / 按周 / 按月（仅活动徽章使用） */
 export type BadgeCadence = 'day' | 'week' | 'month';
 
-/** 徽章达成条件：
+/** 徽章分类：
+ *  - milestone：里程碑徽章（一次性，如减重 3%/5%）
+ *  - achievement：成就徽章（一次性，如连续打卡 7 天、运动 60 分钟）
+ *  - activity：活动徽章（周期性，可重复获得，如每日打卡/本周坚持）
+ */
+export type BadgeCategory = 'milestone' | 'achievement' | 'activity';
+
+/** 徽章达成条件（全部由营养师配置，不写死）：
  *  - checkin_days：周期内有打卡的天数 ≥ threshold
  *  - all_items：周期内「全项完成」的天数 ≥ threshold
+ *  - streak_days：最长连续全项打卡 ≥ threshold 天
+ *  - weight_loss_kg：体重下降 ≥ threshold kg
+ *  - weight_loss_percent：体重下降 ≥ threshold %
+ *  - fat_loss_kg：脂肪量下降 ≥ threshold kg
+ *  - early_exercise_count：早上 9 点前完成运动 ≥ threshold 次
+ *  - single_exercise_minutes：单次运动时长 ≥ threshold 分钟
+ *  - max_intensity：单次运动强度达到 Lv.threshold
+ *  - exercise_type_count：运动种类 ≥ threshold 种
  */
-export type BadgeCondition = 'checkin_days' | 'all_items';
+export type BadgeCondition =
+  | 'checkin_days'
+  | 'all_items'
+  | 'streak_days'
+  | 'weight_loss_kg'
+  | 'weight_loss_percent'
+  | 'fat_loss_kg'
+  | 'early_exercise_count'
+  | 'single_exercise_minutes'
+  | 'max_intensity'
+  | 'exercise_type_count';
 
-/** 趣味活动徽章配置（按营期独立配置） */
+/** 徽章配置（按营期独立配置，营养师可增删改） */
 export interface BadgeConfig {
   id: string;
   /** 所属营期；不填 = 全部营期共用 */
   campId?: string;
-  /** 徽章名称，如「每日打卡」「本周满勤」 */
+  /** 徽章分类 */
+  category: BadgeCategory;
+  /** 徽章名称，如「每日打卡」「本周满勤」「连续 7 天」 */
   name: string;
+  /** 周期（仅活动徽章有意义） */
   cadence: BadgeCadence;
   condition: BadgeCondition;
-  /** 达成阈值（天数） */
+  /** 达成阈值（天数 / 次数 / kg / % / 强度等级，按 condition 解释） */
   threshold: number;
   /** 展示图标（emoji） */
   icon: string;
@@ -517,12 +545,13 @@ export interface BadgeRecord {
   campId: string;
   badgeId: string;
   badgeName: string;
+  category: BadgeCategory;
   cadence: BadgeCadence;
   icon: string;
-  /** 周期键：day=yyyy-MM-dd / week=周一日期 / month=yyyy-MM */
+  /** 周期键：day=yyyy-MM-dd / week=周一日期 / month=yyyy-MM / once=一次性 */
   periodKey: string;
   /** 获得日期 yyyy-MM-dd */
   earnedAt: string;
-  /** 该周期内达成的天数 */
+  /** 该周期内达成的天数 / 达成值 */
   value: number;
 }
