@@ -6,6 +6,7 @@ import { Trophy, TrendingDown, TrendingUp, Activity, Target, Flame, Heart, Award
 import { Tabbar as VanTabbar, TabbarItem as VanTabbarItem, Popup as VanPopup } from 'vant';
 import { MOCK_STUDENT_METRIC_VALUES } from '../mock/data';
 import { generateStudentReport, weightTrendToSvgPoints } from '../lib/campReport';
+import { computeWeightMilestones } from '../lib/campActivities';
 import { exportElementAsImage } from '../lib/exportImage';
 import type { StudentCampReport, MetricChange, Achievement } from '../types';
 
@@ -122,8 +123,22 @@ const labMetrics = computed(() =>
     }),
 );
 
-// 解锁的成就
-const unlockedAchievements = computed(() => report.value.achievements.filter((a) => a.unlocked));
+// 徽章墙：里程碑徽章 + 成就徽章（与「我的徽章」同一套口径）
+const badgeWall = computed(() => {
+  const weights = campWeightRecords.value
+    .filter((r) => !r.studentId || r.studentId === studentId.value)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const start = weights.length ? weights[0].weight : null;
+  const milestones = computeWeightMilestones(weights, start).map((m) => ({
+    id: m.id,
+    title: `减重 ${Math.round(m.threshold * 100)}% 里程碑`,
+    description: m.achieved ? '已达成' : `当前进度 ${Math.round(m.progress * 100)}%`,
+    icon: '🎯',
+    unlocked: m.achieved,
+  }));
+  return [...milestones, ...report.value.achievements];
+});
+const unlockedAchievements = computed(() => badgeWall.value.filter((a) => a.unlocked));
 
 // 营养师结营寄语（按营期存储，key = `${campId}_${studentId}`）
 const campMessage = computed(() => {
@@ -279,21 +294,21 @@ const exportPDF = () => {
           </div>
           <div class="flex-1 bg-white/15 rounded-lg py-2">
             <div class="text-xl font-bold">{{ unlockedAchievements.length }}</div>
-            <div class="text-[10px] opacity-80">成就解锁</div>
+            <div class="text-[10px] opacity-80">徽章解锁</div>
           </div>
         </div>
       </div>
 
-      <!-- 成就墙 -->
+      <!-- 徽章墙（里程碑 + 成就，同一套） -->
       <Card>
         <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
           <Award class="h-4 w-4 text-[#FF976A]" />
-          成就墙
-          <span class="ml-auto text-xs text-gray-400 font-normal">{{ unlockedAchievements.length }}/{{ report.achievements.length }}</span>
+          徽章墙
+          <span class="ml-auto text-xs text-gray-400 font-normal">{{ unlockedAchievements.length }}/{{ badgeWall.length }}</span>
         </h3>
         <div class="grid grid-cols-4 gap-3">
           <div
-            v-for="ach in report.achievements"
+            v-for="ach in badgeWall"
             :key="ach.id"
             class="flex flex-col items-center text-center cursor-pointer hover:scale-105 transition-transform"
             :class="ach.unlocked ? '' : 'opacity-30 grayscale'"
@@ -305,7 +320,7 @@ const exportPDF = () => {
             <div class="text-[10px] font-medium text-gray-700 leading-tight">{{ ach.title }}</div>
           </div>
         </div>
-        <p class="text-[10px] text-gray-400 mt-3 text-center">点击成就图标查看说明</p>
+        <p class="text-[10px] text-gray-400 mt-3 text-center">点击徽章查看说明</p>
       </Card>
 
       <!-- 体重变化 -->
