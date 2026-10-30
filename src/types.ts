@@ -476,3 +476,53 @@ export interface MetricAggregate {
   /** 改善率 */
   improvementRate: number | null;
 }
+
+// ============================================================================
+//  趣味活动 · 徽章（本期不接商城/领取/发放，仅记录与导出）
+// ============================================================================
+
+/** 徽章周期：按天 / 按周 / 按月 */
+export type BadgeCadence = 'day' | 'week' | 'month';
+
+/** 徽章达成条件：
+ *  - checkin_days：周期内有打卡的天数 ≥ threshold
+ *  - all_items：周期内「全项完成」的天数 ≥ threshold
+ */
+export type BadgeCondition = 'checkin_days' | 'all_items';
+
+/** 趣味活动徽章配置（按营期独立配置） */
+export interface BadgeConfig {
+  id: string;
+  /** 所属营期；不填 = 全部营期共用 */
+  campId?: string;
+  /** 徽章名称，如「每日打卡」「本周满勤」 */
+  name: string;
+  cadence: BadgeCadence;
+  condition: BadgeCondition;
+  /** 达成阈值（天数） */
+  threshold: number;
+  /** 展示图标（emoji） */
+  icon: string;
+  /** 活动/徽章说明 */
+  description?: string;
+  /** 是否启用；false = 不再产生新记录（历史记录保留） */
+  active: boolean;
+}
+
+/** 学员徽章获得记录（达成即记录 1 枚；不涉及领取/核销/发放） */
+export interface BadgeRecord {
+  /** `${studentId}_${badgeId}_${periodKey}`，天然幂等 */
+  id: string;
+  studentId: string;
+  campId: string;
+  badgeId: string;
+  badgeName: string;
+  cadence: BadgeCadence;
+  icon: string;
+  /** 周期键：day=yyyy-MM-dd / week=周一日期 / month=yyyy-MM */
+  periodKey: string;
+  /** 获得日期 yyyy-MM-dd */
+  earnedAt: string;
+  /** 该周期内达成的天数 */
+  value: number;
+}

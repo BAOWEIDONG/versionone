@@ -5,6 +5,8 @@ import { Card } from './ui';
 import { Users, UserCircle, LogOut, CheckCircle, XCircle, Search, X, FileText, Settings, ChevronDown } from 'lucide-vue-next';
 import { Tabbar as VanTabbar, TabbarItem as VanTabbarItem, Popup as VanPopup } from 'vant';
 import { rankStudents } from '../lib/scoring';
+import { format, subDays } from 'date-fns';
+import { CalendarDays, ChevronRight as ChevronRightIcon } from 'lucide-vue-next';
 
 const store = useAppStore();
 
@@ -37,6 +39,23 @@ const campDietRecords = computed(() => activeCampId.value ? store.getCampDietRec
 const campWeightRecords = computed(() => activeCampId.value ? store.getCampWeightRecords(activeCampId.value) : store.weightRecords);
 const campExerciseRecords = computed(() => activeCampId.value ? store.getCampExerciseRecords(activeCampId.value) : store.exerciseRecords);
 const campManualRecords = computed(() => activeCampId.value ? store.getCampManualScoreRecords(activeCampId.value) : store.manualScoreRecords);
+
+// 昨日考勤概览（与考勤看板同口径）
+const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+const yesterdayAttendance = computed(() => {
+  const total = campStudents.value.length;
+  let checked = 0;
+  let all = 0;
+  for (const s of campStudents.value) {
+    const meals = new Set(campDietRecords.value.filter((r) => r.studentId === s.id && r.date.startsWith(yesterdayStr)).map((r) => r.meal));
+    const hasEx = campExerciseRecords.value.some((r) => r.studentId === s.id && r.date.startsWith(yesterdayStr));
+    const hasWt = campWeightRecords.value.some((r) => r.studentId === s.id && r.date.startsWith(yesterdayStr));
+    const done = (meals.has('breakfast') ? 1 : 0) + (meals.has('lunch') ? 1 : 0) + (meals.has('dinner') ? 1 : 0) + (hasEx ? 1 : 0) + (hasWt ? 1 : 0);
+    if (done > 0) checked++;
+    if (done === 5) all++;
+  }
+  return { total, checked, unchecked: total - checked, all, rate: total ? Math.round((checked / total) * 100) : 0 };
+});
 
 const unannotatedCount = computed(() => {
   const diet = campDietRecords.value.filter((r) => !r.dietitianComment && r.dietitianScore == null).length;
@@ -147,6 +166,38 @@ const maskPhone = (phone: string) => phone.replace(/(\d{3})\d{4}(\d{4})/, '$1***
           总排名 ›
         </button>
       </div>
+
+      <!-- 学员考勤看板入口：昨日概览，点击看详情 -->
+      <Card class="p-4 cursor-pointer border-0 shadow-sm bg-gradient-to-br from-[#FF976A]/12 to-white active:scale-[0.99] transition-transform" @click="store.setCurrentView('attendance-board')">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-8 h-8 rounded-lg bg-[#FF976A]/15 flex items-center justify-center shrink-0">
+            <CalendarDays class="w-4 h-4 text-[#FF976A]" />
+          </div>
+          <div class="flex-1">
+            <div class="text-sm font-bold text-gray-900">学员考勤看板</div>
+            <div class="text-[10px] text-gray-500">昨日 {{ yesterdayStr }} · 打卡率 {{ yesterdayAttendance.rate }}%</div>
+          </div>
+          <span class="text-[11px] text-[#FF976A] font-bold flex items-center">查看详情<ChevronRightIcon class="w-3.5 h-3.5" /></span>
+        </div>
+        <div class="grid grid-cols-4 gap-2 text-center">
+          <div class="bg-white/70 rounded-xl py-2">
+            <div class="text-lg font-black text-gray-900">{{ yesterdayAttendance.checked }}</div>
+            <div class="text-[10px] text-gray-500">已打卡</div>
+          </div>
+          <div class="bg-white/70 rounded-xl py-2">
+            <div class="text-lg font-black text-[#FF976A]">{{ yesterdayAttendance.unchecked }}</div>
+            <div class="text-[10px] text-gray-500">未打卡</div>
+          </div>
+          <div class="bg-white/70 rounded-xl py-2">
+            <div class="text-lg font-black text-[#07C160]">{{ yesterdayAttendance.all }}</div>
+            <div class="text-[10px] text-gray-500">全项完成</div>
+          </div>
+          <div class="bg-white/70 rounded-xl py-2">
+            <div class="text-lg font-black text-gray-900">{{ yesterdayAttendance.total }}</div>
+            <div class="text-[10px] text-gray-500">应打卡</div>
+          </div>
+        </div>
+      </Card>
 
         <!-- 搜索框 -->
         <div class="relative mb-4">

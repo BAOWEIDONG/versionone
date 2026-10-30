@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { showImagePreview } from 'vant';
-import type { User, WeightRecord, ExerciseRecord, DietRecord, CoachActivityRecord, RewardTier, RewardClaim, MealTimeConfig, MetricConfig, Camp, Account, PointProduct, PointExchangeRecord, ManualScoreRecord } from '../types';
+import type { User, WeightRecord, ExerciseRecord, DietRecord, CoachActivityRecord, RewardTier, RewardClaim, MealTimeConfig, MetricConfig, Camp, Account, PointProduct, PointExchangeRecord, ManualScoreRecord, BadgeConfig, BadgeRecord } from '../types';
 import {
   MOCK_REWARD_TIERS,
   MOCK_REWARD_CLAIMS,
@@ -20,6 +20,7 @@ import {
 } from '../mock/data';
 import * as api from '../lib/api';
 import { calculateTotalScore } from '../lib/scoring';
+import { computeBadgeRecords } from '../lib/badges';
 
 /** 生成 yyyy-MM-dd HH:mm:ss 格式的当前时间字符串（全站统一格式） */
 function formatDateTimeStr(): string {
@@ -66,7 +67,10 @@ export type View =
   | 'activity-hub'
   | 'points-mall'
   | 'fulfillment-center'
-  | 'my-rewards';
+  | 'my-rewards'
+  | 'attendance-board'
+  | 'badge-center'
+  | 'badge-config';
 
 /** 趣味活动配置（营养师端可切换开关；学员端 CampActivitiesView 按此展示） */
 export interface ActivityConfig {
@@ -82,6 +86,16 @@ export interface ActivityConfig {
   weeklyChallengeStartDate?: string;
   /** 每周挑战独立配置：总周数（默认4周） */
   weeklyChallengeWeeks?: number;
+}
+
+/** 新营期默认徽章：日/周/月三档 + 全项达标，营养师可自行增删改 */
+function defaultBadges(campId: string): BadgeConfig[] {
+  return [
+    { id: 'b_day', campId, name: '每日打卡', cadence: 'day', condition: 'checkin_days', threshold: 1, icon: '🌱', description: '每天完成任意一项打卡即获得', active: true },
+    { id: 'b_all', campId, name: '全项达标', cadence: 'day', condition: 'all_items', threshold: 1, icon: '✅', description: '当天早、中、晚、运动、体重全部完成', active: true },
+    { id: 'b_week', campId, name: '本周坚持', cadence: 'week', condition: 'checkin_days', threshold: 3, icon: '🏅', description: '一周内打卡满 3 天', active: true },
+    { id: 'b_month', campId, name: '月度坚持', cadence: 'month', condition: 'checkin_days', threshold: 5, icon: '🏆', description: '一个月内打卡满 5 天', active: true },
+  ];
 }
 
 export const useAppStore = defineStore('app', () => {
@@ -114,6 +128,65 @@ export const useAppStore = defineStore('app', () => {
       [campId]: merged,
     };
     api.updateActivityConfigApi(campId, merged as Record<string, unknown>).catch(() => {});
+  }
+
+  // ─── 趣味活动徽章（本期仅记录 + 导出，不含商城/领取/发放） ───
+  const badgeConfigsByCamp = ref<Record<string, BadgeConfig[]>>({
+    camp1: defaultBadges('camp1'),
+    camp2: defaultBadges('camp2'),
+  });
+  /** 学员徽章获得记录（达成即记 1 枚） */
+  const badgeRecords = ref<BadgeRecord[]>([]);
+
+  function getBadgeConfigs(campId: string | null | undefined): BadgeConfig[] {
+    if (!campId) return [];
+    if (!badgeConfigsByCamp.value[campId]) {
+      badgeConfigsByCamp.value = { ...badgeConfigsByCamp.value, [campId]: defaultBadges(campId) };
+    }
+    return badgeConfigsByCamp.value[campId];
+  }
+
+  function setBadgeConfigs(campId: string, list: BadgeConfig[]) {
+    badgeConfigsByCamp.value = { ...badgeConfigsByCamp.value, [campId]: list };
+  }
+
+  function upsertBadgeConfig(campId: string, cfg: BadgeConfig) {
+    const list = getBadgeConfigs(campId).slice();
+    const i = list.findIndex((x) => x.id === cfg.id);
+    if (i >= 0) list[i] = cfg;
+    else list.push(cfg);
+    setBadgeConfigs(campId, list);
+  }
+
+  function deleteBadgeConfig(campId: string, id: string) {
+    setBadgeConfigs(campId, getBadgeConfigs(campId).filter((x) => x.id !== id));
+  }
+
+  /** 按当前打卡数据重算徽章并合并（id 幂等，不重复记） */
+  function syncBadges(campId: string) {
+    const camp = camps.value.find((c) => c.id === campId);
+    if (!camp) return;
+    const computed = computeBadgeRecords(
+      getBadgeConfigs(campId),
+      getStudentsByCamp(campId),
+      dietRecords.value.filter((r) => r.campId === campId),
+      exerciseRecords.value.filter((r) => r.campId === campId),
+      weightRecords.value.filter((r) => r.campId === campId),
+      camp,
+    );
+    const existing = new Set(badgeRecords.value.map((r) => r.id));
+    const fresh = computed.filter((r) => !existing.has(r.id));
+    if (fresh.length) badgeRecords.value = [...badgeRecords.value, ...fresh];
+  }
+
+  function getCampBadgeRecords(campId: string): BadgeRecord[] {
+    return badgeRecords.value.filter((r) => r.campId === campId);
+  }
+
+  function getStudentBadges(studentId: string, campId: string): BadgeRecord[] {
+    return badgeRecords.value
+      .filter((r) => r.campId === campId && r.studentId === studentId)
+      .sort((a, b) => b.earnedAt.localeCompare(a.earnedAt));
   }
 
   function setCampMessage(campId: string, studentId: string, text: string) {
@@ -905,5 +978,14 @@ export const useAppStore = defineStore('app', () => {
     getStudentCampId,
     getStudentCamps,
     pickLatestCamp,
+    // 趣味活动徽章
+    badgeConfigsByCamp,
+    badgeRecords,
+    getBadgeConfigs,
+    upsertBadgeConfig,
+    deleteBadgeConfig,
+    syncBadges,
+    getCampBadgeRecords,
+    getStudentBadges,
   };
 });

@@ -39,6 +39,9 @@ import ActivityHubView from './components/ActivityHubView.vue';
 import PointsMallView from './components/PointsMallView.vue';
 import FulfillmentCenterView from './components/FulfillmentCenterView.vue';
 import MyRewardsView from './components/MyRewardsView.vue';
+import AttendanceBoardView from './components/AttendanceBoardView.vue';
+import BadgeCenterView from './components/BadgeCenterView.vue';
+import BadgeConfigView from './components/BadgeConfigView.vue';
 
 const store = useAppStore();
 
@@ -80,6 +83,9 @@ const viewMap: Record<string, Component> = {
   'points-mall': PointsMallView,
   'fulfillment-center': FulfillmentCenterView,
   'my-rewards': MyRewardsView,
+  'attendance-board': AttendanceBoardView,
+  'badge-center': BadgeCenterView,
+  'badge-config': BadgeConfigView,
 };
 
 const currentComponent = computed<Component>(() => viewMap[store.currentView] || LoginView);

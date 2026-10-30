@@ -674,6 +674,34 @@ onMounted(() => {
             </div>
           </Card>
 
+          <!-- 我的徽章 -->
+          <Card class="p-5 cursor-pointer hover:shadow-md transition-shadow border-0 shadow-sm flex flex-col justify-between h-32 bg-white relative overflow-hidden" @click="store.setCurrentView('badge-center')">
+            <div class="absolute -top-8 -right-6 w-32 h-32 bg-gradient-to-br from-yellow-100/60 to-orange-50 rounded-full blur-2xl pointer-events-none"></div>
+            <div class="relative z-10">
+              <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-100 to-orange-50 flex items-center justify-center text-amber-500 mb-2 shadow-sm">
+                <Medal class="h-5 w-5" />
+              </div>
+              <div>
+                <div class="text-sm font-bold text-gray-900">我的徽章</div>
+                <div class="text-[11px] text-gray-500 mt-0.5">趣味活动达成记录</div>
+              </div>
+            </div>
+          </Card>
+
+          <!-- 结营报告 -->
+          <Card class="p-5 cursor-pointer hover:shadow-md transition-shadow border-0 shadow-sm flex flex-col justify-between h-32 bg-white relative overflow-hidden" @click="store.setCurrentView('camp-report')">
+            <div class="absolute -top-8 -right-6 w-32 h-32 bg-gradient-to-br from-green-100/60 to-teal-50 rounded-full blur-2xl pointer-events-none"></div>
+            <div class="relative z-10">
+              <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#07C160]/15 to-teal-50 flex items-center justify-center text-[#07C160] mb-2 shadow-sm">
+                <BookOpen class="h-5 w-5" />
+              </div>
+              <div>
+                <div class="text-sm font-bold text-gray-900">结营报告</div>
+                <div class="text-[11px] text-gray-500 mt-0.5">减重数据与健康改善</div>
+              </div>
+            </div>
+          </Card>
+
           <!-- 个人历程入口 - 首期上线版暂移除，后续版本上线 -->
           <!-- <Card class="col-span-2 p-5 cursor-pointer hover:shadow-md transition-shadow border-0 shadow-sm h-32 bg-white relative overflow-hidden" @click="store.setCurrentView('personal-journey')">
             <div class="absolute -top-10 -right-8 w-44 h-44 bg-gradient-to-br from-[#07C160]/12 to-green-50 rounded-full blur-2xl pointer-events-none"></div>

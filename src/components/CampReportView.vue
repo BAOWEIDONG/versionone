@@ -43,18 +43,8 @@ const campDays = computed(() => {
   }
   return store.getCampDays(studentId.value);
 });
-const canView = computed(() => {
-  if (!campInfo.value) return false;
-  if (campInfo.value.status === 'ended') return true;
-  if (campInfo.value.endDate) {
-    const end = new Date(campInfo.value.endDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
-    return today > end;
-  }
-  return false;
-});
+// 报告随时可看：营期进行中展示「阶段性报告」，结营后数据定格为完整报告
+const canView = computed(() => Boolean(campInfo.value));
 
 // 按营期过滤打卡记录
 const campDietRecords = computed(() => selectedCampId.value ? store.getCampDietRecords(selectedCampId.value) : store.dietRecords);
