@@ -792,8 +792,8 @@ onMounted(() => {
     <Teleport to="body">
       <Transition name="summary-fade">
         <div v-if="showDailySummary" class="fixed inset-0 z-[999] bg-black/40 flex items-end justify-center" @click.self="dismissDailySummary">
-          <div class="w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 summary-slide-up">
-            <div class="flex items-center justify-between mb-4">
+          <div class="w-full max-w-md bg-white rounded-t-3xl flex flex-col max-h-[88dvh] summary-slide-up">
+            <div class="flex items-center justify-between px-6 pt-6 pb-3 shrink-0">
               <h3 class="text-base font-black text-gray-900 flex items-center gap-2">
                 <div class="w-8 h-8 rounded-full bg-gradient-to-br from-[#07C160] to-teal-500 flex items-center justify-center">
                   <BookOpen class="w-4 h-4 text-white" />
@@ -805,7 +805,7 @@ onMounted(() => {
               </button>
             </div>
 
-            <div class="max-h-[62vh] overflow-y-auto -mx-1 px-1">
+            <div class="flex-1 min-h-0 overflow-y-auto px-6 pb-3">
               <!-- 昨日打卡明细：完成了哪些、缺哪些 -->
               <div class="rounded-2xl bg-gray-50 p-3 mb-3">
                 <div class="flex items-center justify-between mb-2">
@@ -885,9 +885,11 @@ onMounted(() => {
               </div>
             </div>
 
-            <button @click="dismissDailySummary" class="w-full py-3 rounded-xl bg-gradient-to-r from-[#07C160] to-[#06b558] text-white text-sm font-bold active:scale-[0.98] transition-transform shadow-lg shadow-[#07C160]/20">
-              开启今天 ->
-            </button>
+            <div class="shrink-0 px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-gray-100 bg-white">
+              <button @click="dismissDailySummary" class="w-full py-3 rounded-xl bg-gradient-to-r from-[#07C160] to-[#06b558] text-white text-sm font-bold active:scale-[0.98] transition-transform shadow-lg shadow-[#07C160]/20">
+                开启今天 ->
+              </button>
+            </div>
           </div>
         </div>
       </Transition>
