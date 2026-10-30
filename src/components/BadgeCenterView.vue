@@ -15,8 +15,14 @@ const campId = computed(() => {
 const camp = computed(() => availableCamps.value.find((c) => c.id === campId.value) || null);
 const uid = computed(() => store.user?.id || '');
 
-const configs = computed(() => (campId.value ? store.getBadgeConfigs(campId.value) : []));
-const myBadges = computed(() => (uid.value && campId.value ? store.getStudentBadges(uid.value, campId.value) : []));
+// 统一视图：生效配置 + 已获记录 + 停用/删除后的历史记录（与营养师端同源）
+const badgeView = computed(() => {
+  if (!uid.value || !campId.value) return { earned: [], activeConfigs: [], historical: [] };
+  return store.getStudentBadgeView(uid.value, campId.value);
+});
+const configs = computed(() => badgeView.value.activeConfigs);
+const myBadges = computed(() => badgeView.value.earned);
+const historicalBadges = computed(() => badgeView.value.historical);
 
 const milestoneConfigs = computed(() => configs.value.filter((c) => c.category === 'milestone' && c.active !== false));
 const achievementConfigs = computed(() => configs.value.filter((c) => c.category === 'achievement' && c.active !== false));
@@ -27,9 +33,10 @@ const earnedCountOf = (list: BadgeConfig[]) => list.filter((c) => earnedBadge(c)
 
 const counts = computed(() => ({
   total: myBadges.value.length,
-  milestone: earnedCountOf(milestoneConfigs.value),
-  achievement: earnedCountOf(achievementConfigs.value),
+  milestone: myBadges.value.filter((b) => b.category === 'milestone').length,
+  achievement: myBadges.value.filter((b) => b.category === 'achievement').length,
   activity: myBadges.value.filter((b) => b.category === 'activity').length,
+  historical: historicalBadges.value.length,
 }));
 
 const activityStats = computed(() => activityConfigs.value.map((cfg) => {
@@ -146,7 +153,26 @@ onMounted(() => {
         </div>
       </Card>
 
-      <div v-if="configs.length === 0" class="text-center text-xs text-gray-400 py-6">当前营期暂无徽章配置</div>
+      <!-- 历史徽章：活动停用/删除后，学员已获得的记录仍保留 -->
+      <Card v-if="historicalBadges.length > 0">
+        <h3 class="text-sm font-bold text-gray-900 mb-1 flex items-center gap-2">
+          <Award class="w-4 h-4 text-gray-400" /> 历史徽章
+          <span class="ml-auto text-[11px] text-gray-400 font-normal">{{ historicalBadges.length }} 枚</span>
+        </h3>
+        <p class="text-[10px] text-gray-400 mb-3">活动已停用或删除，已获得的徽章仍为你保留</p>
+        <div class="space-y-2">
+          <div v-for="b in historicalBadges" :key="b.id" class="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+            <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xl shrink-0">{{ b.icon }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-xs font-bold text-gray-900">{{ b.badgeName }}</div>
+              <div class="text-[10px] text-gray-400">{{ b.periodKey === 'once' ? '一次性' : b.periodKey }} · 获得于</div>
+            </div>
+            <div class="text-[10px] text-gray-500 shrink-0">{{ b.earnedAt }}</div>
+          </div>
+        </div>
+      </Card>
+
+      <div v-if="configs.length === 0 && historicalBadges.length === 0" class="text-center text-xs text-gray-400 py-6">当前营期暂无徽章配置</div>
 
       <div class="flex items-start gap-2 text-[11px] text-gray-400 px-1">
         <Info class="w-3.5 h-3.5 shrink-0 mt-0.5" />

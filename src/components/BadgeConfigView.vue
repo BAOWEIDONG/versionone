@@ -5,6 +5,7 @@ import { NavBar, Card, Button } from './ui';
 import { Download, Pencil, Plus, Trash2, X, Search } from 'lucide-vue-next';
 import { Popup as VanPopup, showToast } from 'vant';
 import type { BadgeConfig, BadgeCadence, BadgeCategory, BadgeCondition } from '../types';
+import { MOCK_STUDENT_METRIC_VALUES } from '../mock/data';
 
 const store = useAppStore();
 
@@ -93,6 +94,37 @@ const remove = (c: BadgeConfig) => {
 
 const condText = (c: BadgeConfig) => `${COND_META[c.condition]?.label || c.condition} ≥ ${c.threshold} ${COND_META[c.condition]?.unit || ''}`;
 
+// ─── 数据可达性：当前营期有多少学员具备该条件的判定数据（避免配了但学员达不成） ───
+const campRecords = computed(() => {
+  if (!campId.value) return { diet: [] as any[], ex: [] as any[], wt: [] as any[] };
+  return {
+    diet: store.getCampDietRecords(campId.value),
+    ex: store.getCampExerciseRecords(campId.value),
+    wt: store.getCampWeightRecords(campId.value),
+  };
+});
+const fatMetricId = computed(() => store.metricConfigs.find((c) => c.name.includes('脂肪量'))?.id || '');
+const coverage = (condition: BadgeCondition) => {
+  const total = students.value.length;
+  const { diet, ex, wt } = campRecords.value;
+  const hasAny = (id: string) => diet.some((r: any) => r.studentId === id) || ex.some((r: any) => r.studentId === id) || wt.some((r: any) => r.studentId === id);
+  let n = 0;
+  if (condition === 'checkin_days' || condition === 'all_items' || condition === 'streak_days') {
+    n = students.value.filter((s) => hasAny(s.id)).length;
+  } else if (condition === 'weight_loss_kg' || condition === 'weight_loss_percent') {
+    n = students.value.filter((s) => wt.filter((r: any) => r.studentId === s.id).length >= 2).length;
+  } else if (condition === 'fat_loss_kg') {
+    const fid = fatMetricId.value;
+    n = fid ? students.value.filter((s) => {
+      const v = MOCK_STUDENT_METRIC_VALUES[s.id]?.[fid];
+      return v && typeof v.beforeValue === 'number' && typeof v.afterValue === 'number';
+    }).length : 0;
+  } else {
+    n = students.value.filter((s) => ex.some((r: any) => r.studentId === s.id)).length;
+  }
+  return { n, total };
+};
+
 // ─── 记录筛选 + 导出 ───
 const recordFilter = ref<'all' | BadgeCategory>('all');
 const keyword = ref('');
@@ -166,6 +198,9 @@ const exportCsv = () => {
               </div>
               <div class="text-[11px] text-gray-500 mt-0.5">
                 <template v-if="c.category === 'activity'">{{ CADENCE_LABEL[c.cadence] }} · </template>{{ condText(c) }}
+              </div>
+              <div class="text-[10px] mt-0.5" :class="coverage(c.condition).n === 0 ? 'text-red-500 font-medium' : 'text-gray-400'">
+                可判定 {{ coverage(c.condition).n }}/{{ coverage(c.condition).total }} 人<template v-if="coverage(c.condition).n === 0">（本营期无对应数据，学员暂无法达成）</template>
               </div>
               <div v-if="c.description" class="text-[10px] text-gray-400 mt-0.5 truncate">{{ c.description }}</div>
             </div>
@@ -262,6 +297,10 @@ const exportCsv = () => {
             <label class="text-xs text-gray-500">达成值（{{ COND_META[form.condition]?.unit }}）</label>
             <input v-model.number="form.threshold" type="number" min="0.1" step="0.1" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
           </div>
+        </div>
+
+        <div class="text-[10px]" :class="coverage(form.condition).n === 0 ? 'text-red-500' : 'text-gray-400'">
+          该条件在本营期可判定 {{ coverage(form.condition).n }}/{{ coverage(form.condition).total }} 名学员<template v-if="coverage(form.condition).n === 0">，当前无对应数据，学员无法达成</template>
         </div>
 
         <div>

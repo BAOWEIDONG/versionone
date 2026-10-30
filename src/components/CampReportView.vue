@@ -123,19 +123,20 @@ const labMetrics = computed(() =>
 );
 
 // 徽章墙：与「我的徽章」完全同源 —— 里程碑 + 成就 + 活动，全部读营养师配置与同一份获得记录
-const badgeWall = computed(() => {
+const badgeView = computed(() => {
   const cid = selectedCampId.value || campInfo.value?.id;
-  if (!cid || !store.user) return [];
-  const list = store.getStudentBadges(store.user.id, cid);
+  if (!cid || !store.user) return { earned: [] as any[], activeConfigs: [] as any[], historical: [] as any[] };
+  return store.getStudentBadgeView(store.user.id, cid);
+});
+
+const badgeWall = computed(() => {
+  const { earned, activeConfigs, historical } = badgeView.value;
   const order = { milestone: 0, achievement: 1, activity: 2 } as const;
-  return store
-    .getBadgeConfigs(cid)
-    .filter((c) => c.active !== false)
+  const active = activeConfigs
     .slice()
-    .sort((a, b) => order[a.category] - order[b.category])
-    .map((c) => {
-      const got = list.filter((b) => b.badgeId === c.id);
-      const count = got.length;
+    .sort((a: any, b: any) => order[a.category as keyof typeof order] - order[b.category as keyof typeof order])
+    .map((c: any) => {
+      const count = earned.filter((b: any) => b.badgeId === c.id).length;
       return {
         id: c.id,
         title: count > 1 ? `${c.name} ×${count}` : c.name,
@@ -144,14 +145,19 @@ const badgeWall = computed(() => {
         unlocked: count > 0,
       };
     });
+  // 停用/删除后保留的历史徽章，同样展示，保证与「我的徽章」总数一致
+  const hist = historical.map((r: any) => ({
+    id: `h_${r.id}`,
+    title: `${r.badgeName}（历史）`,
+    description: '活动已停用，已获得徽章保留',
+    icon: r.icon,
+    unlocked: true,
+  }));
+  return [...active, ...hist];
 });
 const unlockedAchievements = computed(() => badgeWall.value.filter((a) => a.unlocked));
 // 已获得徽章总枚数（与「我的徽章」顶部总数同口径：活动徽章按实际枚数累计）
-const earnedBadgeCount = computed(() => {
-  const cid = selectedCampId.value || campInfo.value?.id;
-  if (!cid || !store.user) return 0;
-  return store.getStudentBadges(store.user.id, cid).length;
-});
+const earnedBadgeCount = computed(() => badgeView.value.earned.length);
 
 // 进入报告时按当前配置同步一次徽章
 watch(

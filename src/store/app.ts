@@ -174,10 +174,13 @@ export const useAppStore = defineStore('app', () => {
     if (i >= 0) list[i] = cfg;
     else list.push(cfg);
     setBadgeConfigs(campId, list);
+    // ★配置即联动：任何配置变更后立刻按新规则重算学员徽章，避免「配了但学员端不生效」
+    syncBadges(campId);
   }
 
   function deleteBadgeConfig(campId: string, id: string) {
     setBadgeConfigs(campId, getBadgeConfigs(campId).filter((x) => x.id !== id));
+    syncBadges(campId);
   }
 
   /** 按当前打卡数据与配置重算徽章（活动徽章幂等追加；一次性徽章按配置重建） */
@@ -221,10 +224,19 @@ export const useAppStore = defineStore('app', () => {
       });
     });
 
-    const keptActivity = badgeRecords.value.filter((r) => !(r.campId === campId && r.periodKey === 'once'));
-    const existing = new Set(keptActivity.map((r) => r.id));
-    const freshActivity = activity.filter((r) => !existing.has(r.id));
-    badgeRecords.value = [...keptActivity, ...freshActivity, ...oneTime];
+    // 生效中的配置以最新规则为准重建记录；已停用/已删除的徽章保留历史记录
+    const activeActivityIds = new Set(
+      configs.filter((c) => c.active !== false && c.category === 'activity').map((c) => c.id),
+    );
+    const activeOnceIds = new Set(
+      configs.filter((c) => c.active !== false && c.category !== 'activity').map((c) => c.id),
+    );
+    const preserved = badgeRecords.value.filter((r) => {
+      if (r.campId !== campId) return true;
+      if (r.category === 'activity') return !activeActivityIds.has(r.badgeId);
+      return !activeOnceIds.has(r.badgeId);
+    });
+    badgeRecords.value = [...preserved, ...activity, ...oneTime];
   }
 
   function getCampBadgeRecords(campId: string): BadgeRecord[] {
@@ -235,6 +247,16 @@ export const useAppStore = defineStore('app', () => {
     return badgeRecords.value
       .filter((r) => r.campId === campId && r.studentId === studentId)
       .sort((a, b) => b.earnedAt.localeCompare(a.earnedAt));
+  }
+
+  /** 学员徽章统一视图：当前生效配置 + 已获记录 + 已停用/已删除的历史记录。
+   *  学员端与结营报告都用它，保证「配置端看到的」与「学员端看到的」是同一份。 */
+  function getStudentBadgeView(studentId: string, campId: string) {
+    const earned = getStudentBadges(studentId, campId);
+    const activeConfigs = getBadgeConfigs(campId).filter((c) => c.active !== false);
+    const activeIds = new Set(activeConfigs.map((c) => c.id));
+    const historical = earned.filter((r) => !activeIds.has(r.badgeId));
+    return { earned, activeConfigs, historical };
   }
 
   function setCampMessage(campId: string, studentId: string, text: string) {
@@ -1035,5 +1057,6 @@ export const useAppStore = defineStore('app', () => {
     syncBadges,
     getCampBadgeRecords,
     getStudentBadges,
+    getStudentBadgeView,
   };
 });
