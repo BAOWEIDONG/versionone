@@ -6,6 +6,7 @@ import { Download, Pencil, Plus, Trash2, X, Search } from 'lucide-vue-next';
 import { Popup as VanPopup, showToast } from 'vant';
 import type { BadgeConfig, BadgeCadence, BadgeCategory, BadgeCondition } from '../types';
 import { MOCK_STUDENT_METRIC_VALUES } from '../mock/data';
+import { BADGE_CATEGORY_LABEL, BADGE_CADENCE_LABEL, BADGE_CONDITION_META, describeBadgeCondition } from '../lib/badgeMeta';
 
 const store = useAppStore();
 
@@ -27,20 +28,6 @@ onMounted(() => {
   if (campId.value) store.syncBadges(campId.value);
 });
 
-const CATEGORY_LABEL: Record<BadgeCategory, string> = { milestone: '里程碑', achievement: '成就', activity: '活动' };
-const CADENCE_LABEL: Record<BadgeCadence, string> = { day: '每日', week: '每周', month: '每月' };
-const COND_META: Record<BadgeCondition, { label: string; unit: string }> = {
-  checkin_days: { label: '有打卡天数', unit: '天' },
-  all_items: { label: '全项完成天数', unit: '天' },
-  streak_days: { label: '最长连续打卡', unit: '天' },
-  weight_loss_kg: { label: '体重下降', unit: 'kg' },
-  weight_loss_percent: { label: '体重下降', unit: '%' },
-  fat_loss_kg: { label: '脂肪下降', unit: 'kg' },
-  early_exercise_count: { label: '早9点前运动', unit: '次' },
-  single_exercise_minutes: { label: '单次运动', unit: '分钟' },
-  max_intensity: { label: '运动强度达到', unit: '级' },
-  exercise_type_count: { label: '运动种类', unit: '种' },
-};
 const CONDITIONS_BY_CATEGORY: Record<BadgeCategory, BadgeCondition[]> = {
   milestone: ['weight_loss_percent'],
   achievement: ['streak_days', 'weight_loss_kg', 'fat_loss_kg', 'early_exercise_count', 'single_exercise_minutes', 'max_intensity', 'exercise_type_count'],
@@ -92,7 +79,7 @@ const remove = (c: BadgeConfig) => {
   store.syncBadges(campId.value);
 };
 
-const condText = (c: BadgeConfig) => `${COND_META[c.condition]?.label || c.condition} ≥ ${c.threshold} ${COND_META[c.condition]?.unit || ''}`;
+const condText = (c: BadgeConfig) => describeBadgeCondition(c);
 
 // ─── 数据可达性：当前营期有多少学员具备该条件的判定数据（避免配了但学员达不成） ───
 const campRecords = computed(() => {
@@ -140,7 +127,7 @@ const exportCsv = () => {
   const header = ['学员', '手机号', '营期', '徽章', '分类', '周期', '获得时间', '达成值'];
   const lines = filteredRecords.value.map((r) => [
     nameOf(r.studentId), phoneOf(r.studentId), camp.value?.name || '', r.badgeName,
-    CATEGORY_LABEL[r.category], r.periodKey === 'once' ? '一次性' : r.periodKey, r.earnedAt, String(r.value),
+    BADGE_CATEGORY_LABEL[r.category], r.periodKey === 'once' ? '一次性' : r.periodKey, r.earnedAt, String(r.value),
   ]);
   const csv = [header, ...lines].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -193,11 +180,11 @@ const exportCsv = () => {
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-sm font-bold text-gray-900 truncate">{{ c.name }}</span>
-                <span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-[#1677FF]/10 text-[#1677FF]">{{ CATEGORY_LABEL[c.category] }}</span>
+                <span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-[#1677FF]/10 text-[#1677FF]">{{ BADGE_CATEGORY_LABEL[c.category] }}</span>
                 <span :class="['text-[9px] px-1.5 py-0.5 rounded-full font-bold', c.active ? 'bg-[#07C160]/10 text-[#07C160]' : 'bg-gray-100 text-gray-400']">{{ c.active ? '已启用' : '已停用' }}</span>
               </div>
               <div class="text-[11px] text-gray-500 mt-0.5">
-                <template v-if="c.category === 'activity'">{{ CADENCE_LABEL[c.cadence] }} · </template>{{ condText(c) }}
+                <template v-if="c.category === 'activity'">{{ BADGE_CADENCE_LABEL[c.cadence] }} · </template>{{ condText(c) }}
               </div>
               <div class="text-[10px] mt-0.5" :class="coverage(c.condition).n === 0 ? 'text-red-500 font-medium' : 'text-gray-400'">
                 可判定 {{ coverage(c.condition).n }}/{{ coverage(c.condition).total }} 人<template v-if="coverage(c.condition).n === 0">（本营期无对应数据，学员暂无法达成）</template>
@@ -237,7 +224,7 @@ const exportCsv = () => {
             <div class="w-9 h-9 rounded-full bg-orange-50 flex items-center justify-center text-xl shrink-0">{{ r.icon }}</div>
             <div class="flex-1 min-w-0">
               <div class="text-xs font-bold text-gray-900">{{ nameOf(r.studentId) }} · {{ r.badgeName }}</div>
-              <div class="text-[10px] text-gray-400">{{ CATEGORY_LABEL[r.category] }} · {{ r.periodKey === 'once' ? '一次性' : r.periodKey }} · 达成 {{ r.value }}</div>
+              <div class="text-[10px] text-gray-400">{{ BADGE_CATEGORY_LABEL[r.category] }} · {{ r.periodKey === 'once' ? '一次性' : r.periodKey }} · 达成 {{ r.value }}</div>
             </div>
             <span class="text-[10px] text-gray-500 shrink-0">{{ r.earnedAt }}</span>
           </div>
@@ -290,11 +277,11 @@ const exportCsv = () => {
           <div>
             <label class="text-xs text-gray-500">达成条件</label>
             <select v-model="form.condition" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white">
-              <option v-for="c in conditionsOf(form.category)" :key="c" :value="c">{{ COND_META[c].label }}</option>
+              <option v-for="c in conditionsOf(form.category)" :key="c" :value="c">{{ BADGE_CONDITION_META[c].label }}</option>
             </select>
           </div>
           <div>
-            <label class="text-xs text-gray-500">达成值（{{ COND_META[form.condition]?.unit }}）</label>
+            <label class="text-xs text-gray-500">达成值（{{ BADGE_CONDITION_META[form.condition]?.unit }}）</label>
             <input v-model.number="form.threshold" type="number" min="0.1" step="0.1" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
           </div>
         </div>

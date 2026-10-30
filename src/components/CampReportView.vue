@@ -7,7 +7,8 @@ import { Tabbar as VanTabbar, TabbarItem as VanTabbarItem, Popup as VanPopup } f
 import { MOCK_STUDENT_METRIC_VALUES } from '../mock/data';
 import { generateStudentReport, weightTrendToSvgPoints } from '../lib/campReport';
 import { exportElementAsImage } from '../lib/exportImage';
-import type { StudentCampReport, MetricChange, Achievement } from '../types';
+import type { StudentCampReport, MetricChange, BadgeConfig } from '../types';
+import BadgeInfoPopup from './BadgeInfoPopup.vue';
 
 const store = useAppStore();
 
@@ -248,13 +249,30 @@ const encouragement = computed(() => {
   return `恭喜你！在本次训练营中${parts.join('，')}，展现了出色的自律和毅力！`;
 });
 
-// ─── 成就说明弹窗 ─────────────────────────────────
-const selectedAchievement = ref<Achievement | null>(null);
-const showAchievementPopup = ref(false);
+// ─── 徽章详情弹窗（与「我的徽章」共用同一组件与同一份配置） ─────────────────
+const showBadgeInfo = ref(false);
+const selectedBadgeCfg = ref<BadgeConfig | null>(null);
+const selectedBadgeRecords = computed(() => {
+  if (!selectedBadgeCfg.value) return [];
+  return badgeView.value.earned.filter((b) => b.badgeId === selectedBadgeCfg.value!.id);
+});
 
-const openAchievementDetail = (ach: Achievement) => {
-  selectedAchievement.value = ach;
-  showAchievementPopup.value = true;
+const openBadgeInfo = (item: { id: string }) => {
+  const view = badgeView.value;
+  let cfg: BadgeConfig | undefined = view.activeConfigs.find((c: BadgeConfig) => c.id === item.id);
+  if (!cfg) {
+    const rec = view.earned.find((b) => `h_${b.id}` === item.id) || view.historical.find((b) => `h_${b.id}` === item.id);
+    if (rec) {
+      cfg = {
+        id: rec.badgeId, category: rec.category, name: rec.badgeName, cadence: rec.cadence,
+        condition: 'checkin_days', threshold: 0, icon: rec.icon,
+        description: '该徽章活动已停用或删除，历史获得记录保留', active: false,
+      };
+    }
+  }
+  if (!cfg) return;
+  selectedBadgeCfg.value = cfg;
+  showBadgeInfo.value = true;
 };
 
 // ─── 长图导出（微信可用；未装 html2canvas 时自动降级为打印）───
@@ -338,7 +356,7 @@ const exportPDF = () => {
             :key="ach.id"
             class="flex flex-col items-center text-center cursor-pointer hover:scale-105 transition-transform"
             :class="ach.unlocked ? '' : 'opacity-30 grayscale'"
-            @click="openAchievementDetail(ach)"
+            @click="openBadgeInfo(ach)"
           >
             <div class="w-12 h-12 rounded-full flex items-center justify-center text-2xl mb-1"
               :class="ach.unlocked ? 'bg-gradient-to-br from-yellow-100 to-orange-100' : 'bg-gray-100'"
@@ -595,23 +613,8 @@ const exportPDF = () => {
       </div>
     </div>
 
-    <!-- 成就说明弹窗 -->
-    <VanPopup v-model:show="showAchievementPopup" position="center" round closeable close-icon-position="top-right" class="custom-popup !w-[80%] !max-w-[320px]">
-      <div v-if="selectedAchievement" class="p-6 text-center">
-        <div class="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl mb-3"
-          :class="selectedAchievement.unlocked ? 'bg-gradient-to-br from-yellow-100 to-orange-100' : 'bg-gray-100'"
-        >{{ selectedAchievement.icon }}</div>
-        <h3 class="font-bold text-gray-900 text-lg mb-2">{{ selectedAchievement.title }}</h3>
-        <p class="text-sm text-gray-500 mb-4 leading-relaxed">{{ selectedAchievement.description }}</p>
-        <div class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium"
-          :class="selectedAchievement.unlocked ? 'bg-[#07C160]/10 text-[#07C160]' : 'bg-gray-100 text-gray-400'"
-        >
-          <CheckCircle2 v-if="selectedAchievement.unlocked" class="w-3.5 h-3.5" />
-          <Lock v-else class="w-3.5 h-3.5" />
-          {{ selectedAchievement.unlocked ? '已解锁' : '尚未解锁' }}
-        </div>
-      </div>
-    </VanPopup>
+    <!-- 徽章详情弹窗（与「我的徽章」同一组件） -->
+    <BadgeInfoPopup v-model:show="showBadgeInfo" :config="selectedBadgeCfg" :records="selectedBadgeRecords" :camp-name="campInfo?.name" />
 
     <!-- 营期选择弹窗 -->
     <VanPopup v-model:show="showCampPicker" position="bottom" round>
