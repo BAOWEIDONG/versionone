@@ -122,24 +122,36 @@ const labMetrics = computed(() =>
     }),
 );
 
-// 徽章墙：直接读取营养师配置的徽章（里程碑 + 成就），与「我的徽章」同一套数据
+// 徽章墙：与「我的徽章」完全同源 —— 里程碑 + 成就 + 活动，全部读营养师配置与同一份获得记录
 const badgeWall = computed(() => {
   const cid = selectedCampId.value || campInfo.value?.id;
   if (!cid || !store.user) return [];
   const list = store.getStudentBadges(store.user.id, cid);
-  const earnedIds = new Set(list.map((b) => b.badgeId));
+  const order = { milestone: 0, achievement: 1, activity: 2 } as const;
   return store
     .getBadgeConfigs(cid)
-    .filter((c) => c.category !== 'activity' && c.active !== false)
-    .map((c) => ({
-      id: c.id,
-      title: c.name,
-      description: c.description || '',
-      icon: c.icon,
-      unlocked: earnedIds.has(c.id),
-    }));
+    .filter((c) => c.active !== false)
+    .slice()
+    .sort((a, b) => order[a.category] - order[b.category])
+    .map((c) => {
+      const got = list.filter((b) => b.badgeId === c.id);
+      const count = got.length;
+      return {
+        id: c.id,
+        title: count > 1 ? `${c.name} ×${count}` : c.name,
+        description: c.description || '',
+        icon: c.icon,
+        unlocked: count > 0,
+      };
+    });
 });
 const unlockedAchievements = computed(() => badgeWall.value.filter((a) => a.unlocked));
+// 已获得徽章总枚数（与「我的徽章」顶部总数同口径：活动徽章按实际枚数累计）
+const earnedBadgeCount = computed(() => {
+  const cid = selectedCampId.value || campInfo.value?.id;
+  if (!cid || !store.user) return 0;
+  return store.getStudentBadges(store.user.id, cid).length;
+});
 
 // 进入报告时按当前配置同步一次徽章
 watch(
@@ -301,13 +313,13 @@ const exportPDF = () => {
             <div class="text-[10px] opacity-80">完成率</div>
           </div>
           <div class="flex-1 bg-white/15 rounded-lg py-2">
-            <div class="text-xl font-bold">{{ unlockedAchievements.length }}</div>
-            <div class="text-[10px] opacity-80">徽章解锁</div>
+            <div class="text-xl font-bold">{{ earnedBadgeCount }}</div>
+            <div class="text-[10px] opacity-80">已获徽章</div>
           </div>
         </div>
       </div>
 
-      <!-- 徽章墙（里程碑 + 成就，同一套） -->
+      <!-- 徽章墙（里程碑 / 成就 / 活动，与「我的徽章」同源） -->
       <Card>
         <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
           <Award class="h-4 w-4 text-[#FF976A]" />
