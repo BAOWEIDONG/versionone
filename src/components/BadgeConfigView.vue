@@ -17,6 +17,13 @@ const campId = computed(() => {
 });
 const camp = computed(() => store.camps.find((c) => c.id === campId.value) || null);
 const students = computed(() => (campId.value ? store.getStudentsByCamp(campId.value) : []));
+
+/** 预置徽章图标，供营养师直接点选（也可自定义输入） */
+const EMOJI_PRESETS = [
+  '🌱', '✅', '🏅', '🏆', '🎯', '🔥', '⚖️', '👑',
+  '🌅', '⚡', '🎽', '💪', '🥇', '🥈', '🥉', '🌟',
+  '⭐', '❤️', '📅', '📆', '🗓️', '🎖️', '🧡', '💚',
+];
 const nameOf = (id: string) => students.value.find((s) => s.id === id)?.name || id;
 const phoneOf = (id: string) => students.value.find((s) => s.id === id)?.phone || '';
 
@@ -258,19 +265,24 @@ const exportCsv = () => {
           <input v-model="form.name" placeholder="如：本周满勤 / 连续 7 天" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="text-xs text-gray-500">图标（emoji）</label>
-            <input v-model="form.icon" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+        <div>
+          <label class="text-xs text-gray-500">图标（选择或自定义）</label>
+          <div class="grid grid-cols-8 gap-1.5 mt-1">
+            <button v-for="e in EMOJI_PRESETS" :key="e" type="button" @click="form.icon = e"
+              :class="['aspect-square rounded-lg flex items-center justify-center text-lg border transition-colors', form.icon === e ? 'border-[#FF976A] bg-orange-50' : 'border-gray-200 bg-white']">
+              {{ e }}
+            </button>
           </div>
-          <div v-if="form.category === 'activity'">
-            <label class="text-xs text-gray-500">周期</label>
-            <select v-model="form.cadence" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white">
-              <option value="day">每日</option>
-              <option value="week">每周</option>
-              <option value="month">每月</option>
-            </select>
-          </div>
+          <input v-model="form.icon" placeholder="也可输入自定义 emoji" class="w-full mt-2 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+        </div>
+
+        <div v-if="form.category === 'activity'">
+          <label class="text-xs text-gray-500">周期</label>
+          <select v-model="form.cadence" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white">
+            <option value="day">每日</option>
+            <option value="week">每周</option>
+            <option value="month">每月</option>
+          </select>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
