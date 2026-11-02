@@ -158,6 +158,7 @@ const itemDefs = [
       <Card>
         <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
           <Users class="w-4 h-4 text-[#FF976A]" /> 各项目打卡人数
+          <span class="ml-auto text-[11px] text-gray-400 font-normal">本营期共 {{ summary.total }} 人</span>
         </h3>
         <div class="space-y-2.5">
           <div v-for="it in itemStats" :key="it.key" class="flex items-center gap-2">
@@ -165,7 +166,7 @@ const itemDefs = [
             <div class="flex-1 h-2.5 rounded-full bg-gray-100 overflow-hidden">
               <div class="h-full rounded-full transition-all" :style="{ width: it.pct + '%', background: it.color }"></div>
             </div>
-            <span class="text-xs text-gray-700 w-16 text-right shrink-0 font-medium">{{ it.count }}人 · {{ it.pct }}%</span>
+            <span class="text-xs text-gray-700 w-24 text-right shrink-0 font-medium">{{ it.count }}/{{ summary.total }}人 · {{ it.pct }}%</span>
           </div>
         </div>
       </Card>
