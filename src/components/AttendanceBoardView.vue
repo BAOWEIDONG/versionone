@@ -10,9 +10,15 @@ const store = useAppStore();
 const selectedCamp = computed(() => store.camps.find((c) => c.id === store.selectedCampId) || null);
 const campStudents = computed(() => (store.selectedCampId ? store.getStudentsByCamp(store.selectedCampId) : store.getAllStudents()));
 
-// 默认昨天；可在营期范围内前后翻天
+// 默认昨天；顶部可一键切换「昨天 / 今天」，也可在营期范围内前后翻天
+const todayStr = format(new Date(), 'yyyy-MM-dd');
 const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 const dateStr = ref(yesterday);
+const isToday = computed(() => dateStr.value === todayStr);
+const isYesterday = computed(() => dateStr.value === yesterday);
+const setQuickDate = (kind: 'yesterday' | 'today') => {
+  dateStr.value = kind === 'today' ? todayStr : yesterday;
+};
 
 const dateObj = computed(() => new Date(`${dateStr.value}T00:00:00`));
 const canPrev = computed(() => {
@@ -28,7 +34,6 @@ const shiftDay = (n: number) => {
   if (n > 0 && !canNext.value) return;
   dateStr.value = format(addDays(dateObj.value, n), 'yyyy-MM-dd');
 };
-const goYesterday = () => { dateStr.value = yesterday; };
 
 const diet = computed(() => (store.selectedCampId ? store.getCampDietRecords(store.selectedCampId) : store.dietRecords));
 const ex = computed(() => (store.selectedCampId ? store.getCampExerciseRecords(store.selectedCampId) : store.exerciseRecords));
@@ -101,28 +106,30 @@ const itemDefs = [
 
 <template>
   <div class="flex min-h-full flex-col bg-[#F7F8FA] pb-8 font-sans">
-    <NavBar title="学员考勤看板" :on-back="store.goBack">
-      <template #right>
-        <button @click="goYesterday" class="text-xs text-[#FF976A] font-bold px-3 py-1.5 rounded-full bg-orange-50">昨天</button>
-      </template>
-    </NavBar>
+    <NavBar title="学员打卡情况看板" :on-back="store.goBack" />
 
-    <!-- 当前营期 + 日期 -->
+    <!-- 当前营期 + 昨天/今天切换 + 日期 -->
     <div class="bg-white px-4 py-3 border-b border-gray-100">
       <div class="flex items-center justify-between">
         <div class="text-xs text-gray-500">当前营期 · <span class="text-gray-800 font-medium">{{ selectedCamp?.name || '未选择' }}</span></div>
-        <div class="flex items-center gap-2">
-          <button :disabled="!canPrev" :class="['w-8 h-8 rounded-full flex items-center justify-center', canPrev ? 'bg-gray-100 text-gray-700 active:bg-gray-200' : 'bg-gray-50 text-gray-300']" @click="shiftDay(-1)">
-            <ChevronLeft class="w-4 h-4" />
-          </button>
-          <label class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 text-sm font-bold text-gray-900">
-            <CalendarDays class="w-4 h-4 text-[#FF976A]" />
-            <input v-model="dateStr" type="date" class="bg-transparent outline-none text-sm font-bold" />
-          </label>
-          <button :disabled="!canNext" :class="['w-8 h-8 rounded-full flex items-center justify-center', canNext ? 'bg-gray-100 text-gray-700 active:bg-gray-200' : 'bg-gray-50 text-gray-300']" @click="shiftDay(1)">
-            <ChevronRight class="w-4 h-4" />
-          </button>
+        <div class="flex bg-gray-100 p-0.5 rounded-full">
+          <button @click="setQuickDate('yesterday')"
+            :class="['px-3 py-1 rounded-full text-xs font-bold transition-colors', isYesterday ? 'bg-white text-[#FF976A] shadow-sm' : 'text-gray-500']">昨天</button>
+          <button @click="setQuickDate('today')"
+            :class="['px-3 py-1 rounded-full text-xs font-bold transition-colors', isToday ? 'bg-white text-[#FF976A] shadow-sm' : 'text-gray-500']">今天</button>
         </div>
+      </div>
+      <div class="flex items-center justify-center gap-2 mt-2.5">
+        <button :disabled="!canPrev" :class="['w-8 h-8 rounded-full flex items-center justify-center', canPrev ? 'bg-gray-100 text-gray-700 active:bg-gray-200' : 'bg-gray-50 text-gray-300']" @click="shiftDay(-1)">
+          <ChevronLeft class="w-4 h-4" />
+        </button>
+        <label class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 text-sm font-bold text-gray-900">
+          <CalendarDays class="w-4 h-4 text-[#FF976A]" />
+          <input v-model="dateStr" type="date" class="bg-transparent outline-none text-sm font-bold" />
+        </label>
+        <button :disabled="!canNext" :class="['w-8 h-8 rounded-full flex items-center justify-center', canNext ? 'bg-gray-100 text-gray-700 active:bg-gray-200' : 'bg-gray-50 text-gray-300']" @click="shiftDay(1)">
+          <ChevronRight class="w-4 h-4" />
+        </button>
       </div>
     </div>
 

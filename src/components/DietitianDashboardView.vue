@@ -167,14 +167,14 @@ const maskPhone = (phone: string) => phone.replace(/(\d{3})\d{4}(\d{4})/, '$1***
         </button>
       </div>
 
-      <!-- 学员考勤看板入口：昨日概览，点击看详情 -->
+      <!-- 学员打卡情况看板入口：昨日概览，点击看详情 -->
       <Card class="p-4 cursor-pointer border-0 shadow-sm bg-gradient-to-br from-[#FF976A]/12 to-white active:scale-[0.99] transition-transform" @click="store.setCurrentView('attendance-board')">
         <div class="flex items-center gap-2 mb-3">
           <div class="w-8 h-8 rounded-lg bg-[#FF976A]/15 flex items-center justify-center shrink-0">
             <CalendarDays class="w-4 h-4 text-[#FF976A]" />
           </div>
           <div class="flex-1">
-            <div class="text-sm font-bold text-gray-900">学员考勤看板</div>
+            <div class="text-sm font-bold text-gray-900">学员打卡情况看板</div>
             <div class="text-[10px] text-gray-500">昨日 {{ yesterdayStr }} · 打卡率 {{ yesterdayAttendance.rate }}%</div>
           </div>
           <span class="text-[11px] text-[#FF976A] font-bold flex items-center">查看详情<ChevronRightIcon class="w-3.5 h-3.5" /></span>
