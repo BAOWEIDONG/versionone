@@ -294,6 +294,8 @@ export const useAppStore = defineStore('app', () => {
 
   const selectedStudentId = ref<string | null>(null);
   const selectedDateStr = ref<string | null>(null);
+  /** 营养师首页「昨天/今天」切换后进入打卡情况看板的初始日期 */
+  const attendanceBoardDate = ref<string>('');
 
   /** 积分排行模式：从 RankingView 传到 PointsDetailView，决定展示总榜还是周榜数据 */
   const rankMode = ref<'total' | 'progress'>('total');
@@ -965,6 +967,7 @@ export const useAppStore = defineStore('app', () => {
     getCampCoachActivities,
     selectedStudentId,
     selectedDateStr,
+    attendanceBoardDate,
     rankMode,
     selectedCampId,
     detailSelectedCampId,

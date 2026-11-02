@@ -40,16 +40,24 @@ const campWeightRecords = computed(() => activeCampId.value ? store.getCampWeigh
 const campExerciseRecords = computed(() => activeCampId.value ? store.getCampExerciseRecords(activeCampId.value) : store.exerciseRecords);
 const campManualRecords = computed(() => activeCampId.value ? store.getCampManualScoreRecords(activeCampId.value) : store.manualScoreRecords);
 
-// 昨日考勤概览（与考勤看板同口径）
+// 打卡情况概览：首页可直接切换「昨天 / 今天」（与看板详情同口径）
 const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-const yesterdayAttendance = computed(() => {
+const attendanceDay = ref<'yesterday' | 'today'>('yesterday');
+const attendanceDate = computed(() => (attendanceDay.value === 'today' ? todayStr : yesterdayStr));
+const attendanceDayLabel = computed(() => (attendanceDay.value === 'today' ? '今天' : '昨天'));
+const openAttendanceBoard = () => {
+  store.attendanceBoardDate = attendanceDate.value;
+  store.setCurrentView('attendance-board');
+};
+const attendanceSummary = computed(() => {
+  const date = attendanceDate.value;
   const total = campStudents.value.length;
   let checked = 0;
   let all = 0;
   for (const s of campStudents.value) {
-    const meals = new Set(campDietRecords.value.filter((r) => r.studentId === s.id && r.date.startsWith(yesterdayStr)).map((r) => r.meal));
-    const hasEx = campExerciseRecords.value.some((r) => r.studentId === s.id && r.date.startsWith(yesterdayStr));
-    const hasWt = campWeightRecords.value.some((r) => r.studentId === s.id && r.date.startsWith(yesterdayStr));
+    const meals = new Set(campDietRecords.value.filter((r) => r.studentId === s.id && r.date.startsWith(date)).map((r) => r.meal));
+    const hasEx = campExerciseRecords.value.some((r) => r.studentId === s.id && r.date.startsWith(date));
+    const hasWt = campWeightRecords.value.some((r) => r.studentId === s.id && r.date.startsWith(date));
     const done = (meals.has('breakfast') ? 1 : 0) + (meals.has('lunch') ? 1 : 0) + (meals.has('dinner') ? 1 : 0) + (hasEx ? 1 : 0) + (hasWt ? 1 : 0);
     if (done > 0) checked++;
     if (done === 5) all++;
@@ -167,35 +175,44 @@ const maskPhone = (phone: string) => phone.replace(/(\d{3})\d{4}(\d{4})/, '$1***
         </button>
       </div>
 
-      <!-- 学员打卡情况看板入口：昨日概览，点击看详情 -->
-      <Card class="p-4 cursor-pointer border-0 shadow-sm bg-gradient-to-br from-[#FF976A]/12 to-white active:scale-[0.99] transition-transform" @click="store.setCurrentView('attendance-board')">
+      <!-- 学员打卡情况看板：首页可直接切换昨天/今天，点卡片看详情 -->
+      <Card class="p-4 cursor-pointer border-0 shadow-sm bg-gradient-to-br from-[#FF976A]/12 to-white active:scale-[0.99] transition-transform" @click="openAttendanceBoard">
         <div class="flex items-center gap-2 mb-3">
           <div class="w-8 h-8 rounded-lg bg-[#FF976A]/15 flex items-center justify-center shrink-0">
             <CalendarDays class="w-4 h-4 text-[#FF976A]" />
           </div>
-          <div class="flex-1">
+          <div class="flex-1 min-w-0">
             <div class="text-sm font-bold text-gray-900">学员打卡情况看板</div>
-            <div class="text-[10px] text-gray-500">昨日 {{ yesterdayStr }} · 打卡率 {{ yesterdayAttendance.rate }}%</div>
+            <div class="text-[10px] text-gray-500">{{ attendanceDayLabel }} {{ attendanceDate }} · 打卡率 {{ attendanceSummary.rate }}%</div>
           </div>
-          <span class="text-[11px] text-[#FF976A] font-bold flex items-center">查看详情<ChevronRightIcon class="w-3.5 h-3.5" /></span>
+          <!-- 昨天/今天切换：阻止冒泡，避免点切换时跳转详情 -->
+          <div class="flex bg-gray-100 p-0.5 rounded-full shrink-0" @click.stop>
+            <button @click="attendanceDay = 'yesterday'"
+              :class="['px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors', attendanceDay === 'yesterday' ? 'bg-white text-[#FF976A] shadow-sm' : 'text-gray-500']">昨天</button>
+            <button @click="attendanceDay = 'today'"
+              :class="['px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors', attendanceDay === 'today' ? 'bg-white text-[#FF976A] shadow-sm' : 'text-gray-500']">今天</button>
+          </div>
         </div>
         <div class="grid grid-cols-4 gap-2 text-center">
           <div class="bg-white/70 rounded-xl py-2">
-            <div class="text-lg font-black text-gray-900">{{ yesterdayAttendance.checked }}</div>
+            <div class="text-lg font-black text-gray-900">{{ attendanceSummary.checked }}</div>
             <div class="text-[10px] text-gray-500">已打卡</div>
           </div>
           <div class="bg-white/70 rounded-xl py-2">
-            <div class="text-lg font-black text-[#FF976A]">{{ yesterdayAttendance.unchecked }}</div>
+            <div class="text-lg font-black text-[#FF976A]">{{ attendanceSummary.unchecked }}</div>
             <div class="text-[10px] text-gray-500">未打卡</div>
           </div>
           <div class="bg-white/70 rounded-xl py-2">
-            <div class="text-lg font-black text-[#07C160]">{{ yesterdayAttendance.all }}</div>
+            <div class="text-lg font-black text-[#07C160]">{{ attendanceSummary.all }}</div>
             <div class="text-[10px] text-gray-500">全项完成</div>
           </div>
           <div class="bg-white/70 rounded-xl py-2">
-            <div class="text-lg font-black text-gray-900">{{ yesterdayAttendance.total }}</div>
+            <div class="text-lg font-black text-gray-900">{{ attendanceSummary.total }}</div>
             <div class="text-[10px] text-gray-500">应打卡</div>
           </div>
+        </div>
+        <div class="flex items-center justify-end mt-2 text-[10px] text-[#FF976A] font-bold">
+          查看每位学员明细 <ChevronRightIcon class="w-3.5 h-3.5" />
         </div>
       </Card>
 

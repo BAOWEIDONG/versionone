@@ -13,7 +13,7 @@ const campStudents = computed(() => (store.selectedCampId ? store.getStudentsByC
 // 默认昨天；顶部可一键切换「昨天 / 今天」，也可在营期范围内前后翻天
 const todayStr = format(new Date(), 'yyyy-MM-dd');
 const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-const dateStr = ref(yesterday);
+const dateStr = ref(store.attendanceBoardDate || yesterday);
 const isToday = computed(() => dateStr.value === todayStr);
 const isYesterday = computed(() => dateStr.value === yesterday);
 const setQuickDate = (kind: 'yesterday' | 'today') => {
