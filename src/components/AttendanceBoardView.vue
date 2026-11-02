@@ -134,23 +134,33 @@ const itemDefs = [
     </div>
 
     <div class="p-4 space-y-4">
-      <!-- 概览 -->
+      <!-- 概览：打卡覆盖 + 完成质量（避免四个卡互相重复） -->
+      <div class="flex items-center justify-between px-1">
+        <span class="text-xs font-bold text-gray-700">打卡概览</span>
+        <span class="text-[11px] text-gray-400">本营期共 {{ summary.total }} 人</span>
+      </div>
       <div class="grid grid-cols-2 gap-3">
-        <Card class="p-4 text-center">
-          <div class="text-2xl font-black text-gray-900">{{ summary.checked }}<span class="text-sm font-normal text-gray-400">/{{ summary.total }}</span></div>
+        <Card class="p-4">
+          <div class="flex items-end gap-1">
+            <span class="text-2xl font-black text-gray-900">{{ summary.checked }}</span>
+            <span class="text-sm text-gray-400 mb-0.5">/ {{ summary.total }} 人</span>
+          </div>
           <div class="text-[11px] text-gray-500 mt-1">已打卡 · 打卡率 {{ summary.rate }}%</div>
+          <div class="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full rounded-full bg-[#FF976A] transition-all" :style="{ width: summary.rate + '%' }"></div>
+          </div>
+          <div class="text-[10px] text-gray-400 mt-1">未打卡 {{ summary.unchecked }} 人</div>
         </Card>
-        <Card class="p-4 text-center">
-          <div class="text-2xl font-black text-[#FF976A]">{{ summary.unchecked }}</div>
-          <div class="text-[11px] text-gray-500 mt-1">未打卡</div>
-        </Card>
-        <Card class="p-4 text-center">
-          <div class="text-2xl font-black text-[#07C160]">{{ summary.all }}</div>
-          <div class="text-[11px] text-gray-500 mt-1">全项完成 · {{ summary.allRate }}%</div>
-        </Card>
-        <Card class="p-4 text-center">
-          <div class="text-2xl font-black text-[#1677FF]">{{ summary.total }}</div>
-          <div class="text-[11px] text-gray-500 mt-1">应打卡人数</div>
+        <Card class="p-4">
+          <div class="flex items-end gap-1">
+            <span class="text-2xl font-black text-[#07C160]">{{ summary.all }}</span>
+            <span class="text-sm text-gray-400 mb-0.5">/ {{ summary.total }} 人</span>
+          </div>
+          <div class="text-[11px] text-gray-500 mt-1">全项完成 · 全项率 {{ summary.allRate }}%</div>
+          <div class="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full rounded-full bg-[#07C160] transition-all" :style="{ width: summary.allRate + '%' }"></div>
+          </div>
+          <div class="text-[10px] text-gray-400 mt-1">部分完成 {{ summary.checked - summary.all }} 人</div>
         </Card>
       </div>
 
