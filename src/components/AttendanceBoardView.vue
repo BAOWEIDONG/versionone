@@ -203,7 +203,7 @@ const itemDefs = [
               <span class="text-[10px] text-gray-500">{{ r.gender === 'male' ? '男' : '女' }} · {{ r.age }}岁</span>
               <span v-if="r.all" class="text-[9px] px-1.5 py-0.5 rounded bg-[#07C160]/10 text-[#07C160] font-bold">全项完成</span>
               <span v-else-if="!r.any" class="text-[9px] px-1.5 py-0.5 rounded bg-red-50 text-red-500 font-bold">未打卡</span>
-              <span class="ml-auto text-[10px] text-gray-400">{{ r.firstTime || '--' }}</span>
+              <span class="ml-auto text-[10px] text-gray-400">{{ r.firstTime ? '首次打卡 ' + r.firstTime : '未打卡' }}</span>
               <Arrow class="w-3.5 h-3.5 text-gray-300" />
             </div>
             <div class="flex flex-wrap gap-1.5 mt-2">
