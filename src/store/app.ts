@@ -118,6 +118,18 @@ function defaultBadges(campId: string): BadgeConfig[] {
 }
 
 const ACCOUNTS_STORAGE_KEY = 'camp_accounts_v2';
+const ACCOUNTS_DELETED_KEY = 'camp_accounts_deleted_v1';
+
+function loadDeletedAccountIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_DELETED_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(list) ? list : []);
+  } catch { return new Set(); }
+}
+function persistDeletedAccountIds(ids: Set<string>) {
+  try { localStorage.setItem(ACCOUNTS_DELETED_KEY, JSON.stringify([...ids])); } catch { /* ignore */ }
+}
 
 /** 读取本地持久化的账户列表（含运营总览权限等后台配置） */
 function loadPersistedAccounts(): Account[] | null {
@@ -127,9 +139,10 @@ function loadPersistedAccounts(): Account[] | null {
     const list = JSON.parse(raw);
     if (Array.isArray(list) && list.length > 0) {
       const merged = list as Account[];
-      // 合并新增的种子账户（如体验账号），保留本地已有的授权/修改
+      const deleted = loadDeletedAccountIds();
+      // 合并新增的种子账户（如体验账号），保留本地已有的授权/修改；已删除的不再补回
       for (const seedAcc of MOCK_ACCOUNTS) {
-        if (!merged.some((a) => a.id === seedAcc.id)) merged.push(seedAcc);
+        if (!deleted.has(seedAcc.id) && !merged.some((a) => a.id === seedAcc.id)) merged.push(seedAcc);
       }
       // 体验学员统一归属第一期，保证登录即见完整演示数据
       const demoStudent = merged.find((a) => a.id === 's13');
@@ -812,6 +825,8 @@ export const useAppStore = defineStore('app', () => {
   function addAccount(account: Account) {
     accounts.value.push(account);
     persistAccounts(accounts.value);
+    const deleted = loadDeletedAccountIds();
+    if (deleted.delete(account.id)) persistDeletedAccountIds(deleted);
     api.createAccount(account).catch(() => {});
   }
   function updateAccount(id: string, updates: Partial<Account>) {
@@ -822,6 +837,9 @@ export const useAppStore = defineStore('app', () => {
   function deleteAccount(id: string) {
     accounts.value = accounts.value.filter((a) => a.id !== id);
     persistAccounts(accounts.value);
+    const deleted = loadDeletedAccountIds();
+    deleted.add(id);
+    persistDeletedAccountIds(deleted);
     api.deleteAccount(id).catch(() => {});
   }
 
