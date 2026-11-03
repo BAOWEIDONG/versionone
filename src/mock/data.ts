@@ -869,6 +869,8 @@ export const MOCK_ACCOUNTS: Account[] = [
   { id: 'd0', phone: '18888888888', name: '管理员', role: 'dietitian', active: true, createdAt: iso(-30, '09:00:00') },
   { id: 'd1', phone: '13900000001', name: '王营养师', role: 'dietitian', active: true, createdAt: iso(-30, '09:00:00') },
   { id: 'd2', phone: '13900000002', name: '李营养师', role: 'dietitian', active: true, createdAt: iso(-20, '09:00:00') },
+  // 督导演示账号：可看全部学员数据与营养师/教练批注情况，仅该标记账号可进入督导看板
+  { id: 'sup1', phone: '13900000009', name: '运营督导', role: 'dietitian', campIds: ['camp1', 'camp2'], active: true, supervisor: true, createdAt: iso(-30, '09:00:00') },
   // 教练
   { id: 'c1', phone: '13700000001', name: '李教练', role: 'coach', campIds: ['camp1'], active: true, createdAt: iso(-28, '10:00:00') },
   { id: 'c2', phone: '13700000002', name: '王教练', role: 'coach', campIds: ['camp1', 'camp2'], active: true, createdAt: iso(-28, '10:00:00') },
@@ -911,3 +913,47 @@ export const MOCK_MANUAL_SCORES: ManualScoreRecord[] = [
   { id: 'ms2', studentId: 's2', points: 6, reason: '线下运动打卡补录', dietitianName: '营养师小王', createdAt: iso(-2, '10:05:00'), date: dateStr(-5), campId: 'camp1' },
   { id: 'ms3', studentId: 's3', points: -2, reason: '打卡作弊扣分', dietitianName: '营养师小王', createdAt: iso(-1, '15:00:00'), date: dateStr(-1), campId: 'camp1' },
 ];
+
+// ── 督导看板演示数据：给昨日部分记录补充营养师/教练批注（含多人批注结构） ──
+(() => {
+  const y = iso(-1, '12:00:00').substring(0, 10);
+  const annotate = (records: any[], role: 'dietitian' | 'coach', name: string, ids: string[], text: string) => {
+    records
+      .filter((r) => r.campId === 'camp1' && r.date.startsWith(y) && ids.includes(r.studentId))
+      .forEach((r) => {
+        const date = `${r.date.substring(0, 10)} ${String(Math.min(23, parseInt(r.date.substring(11, 13), 10) + 1)).padStart(2, '0')}:30:00`;
+        const c = { id: `demo_${role}_${r.id}`, role, name, text, date };
+        r.comments = [...(r.comments || []), c];
+        if (role === 'dietitian') {
+          r.dietitianComment = text; r.dietitianName = name; r.dietitianCommentDate = date;
+        } else {
+          r.coachComment = text; r.coachName = name; r.coachCommentDate = date;
+        }
+      });
+  };
+  annotate(MOCK_DIET_RECORDS, 'dietitian', '王营养师', ['s1', 's2', 's4'], '饮食结构不错，主食再减一点');
+  annotate(MOCK_WEIGHT_RECORDS, 'dietitian', '李营养师', ['s1', 's3'], '体重下降稳定，继续保持');
+  annotate(MOCK_EXERCISE_RECORDS, 'coach', '王教练', ['s1', 's2', 's5'], '强度到位，注意拉伸');
+})();
+
+// ── 督导看板演示数据（第二期）：同样补一批昨日批注，保证默认营期可见 ──
+(() => {
+  const y = iso(-1, '12:00:00').substring(0, 10);
+  const annotate = (records: any[], role: 'dietitian' | 'coach', name: string, ids: string[], text: string) => {
+    records
+      .filter((r) => r.campId === 'camp2' && r.date.startsWith(y) && ids.includes(r.studentId))
+      .forEach((r) => {
+        const date = `${r.date.substring(0, 10)} ${String(Math.min(23, parseInt(r.date.substring(11, 13), 10) + 1)).padStart(2, '0')}:20:00`;
+        const c = { id: `demo2_${role}_${r.id}`, role, name, text, date };
+        r.comments = [...(r.comments || []), c];
+        if (role === 'dietitian') {
+          r.dietitianComment = text; r.dietitianName = name; r.dietitianCommentDate = date;
+        } else {
+          r.coachComment = text; r.coachName = name; r.coachCommentDate = date;
+        }
+      });
+  };
+  annotate(MOCK_DIET_RECORDS, 'dietitian', '王营养师', ['s6', 's7'], '晚餐碳水偏多，建议换成粗粮');
+  annotate(MOCK_WEIGHT_RECORDS, 'dietitian', '李营养师', ['s6'], '下降节奏很好');
+  annotate(MOCK_EXERCISE_RECORDS, 'coach', '王教练', ['s6', 's8'], '动作标准，保持频率');
+})();

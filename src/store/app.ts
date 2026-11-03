@@ -72,7 +72,8 @@ export type View =
   | 'my-rewards'
   | 'attendance-board'
   | 'badge-center'
-  | 'badge-config';
+  | 'badge-config'
+  | 'supervisor-dashboard';
 
 /** 趣味活动配置（营养师端可切换开关；学员端 CampActivitiesView 按此展示） */
 export interface ActivityConfig {
@@ -440,7 +441,9 @@ export const useAppStore = defineStore('app', () => {
         const qSaved = localStorage.getItem('submitted_questionnaire');
         questionnaireAnswered.value = !!qSaved;
         // 根据角色和问卷状态跳转到对应首页
-        if (data.user.role === 'coach') {
+        if (data.user.supervisor) {
+          viewHistory.value = ['supervisor-dashboard'];
+        } else if (data.user.role === 'coach') {
           viewHistory.value = ['coach-dashboard'];
         } else if (data.user.role === 'dietitian') {
           viewHistory.value = ['dietitian-dashboard'];
@@ -467,12 +470,14 @@ export const useAppStore = defineStore('app', () => {
 
   /** 底部 Tab 根页面（切换时去重，避免历史栈无限增长） */
   // 首期上线版：学员端底部Tab为 首页/档案（移除活动/消息）
-  const TAB_ROOTS: View[] = ['dashboard', 'health-profile', 'coach-dashboard', 'dietitian-dashboard', 'dietitian-unannotated-list', 'dietitian-config'];
+  const TAB_ROOTS: View[] = ['dashboard', 'health-profile', 'coach-dashboard', 'dietitian-dashboard', 'dietitian-unannotated-list', 'dietitian-config', 'supervisor-dashboard'];
 
   /** 学员详情流视图：在此流内继承 detailSelectedCampId，离开则清空（不污染全局 selectedCampId） */
   const DETAIL_FLOW_VIEWS: View[] = ['dietitian-student-detail', 'coach-student-detail', 'pointsDetail'];
 
   function setCurrentView(view: View) {
+    // 督导看板仅限带督导权限的账号进入
+    if (view === 'supervisor-dashboard' && !user.value?.supervisor) return;
     const current = viewHistory.value[viewHistory.value.length - 1];
     if (current === view) return;
 

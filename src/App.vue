@@ -42,6 +42,7 @@ import MyRewardsView from './components/MyRewardsView.vue';
 import AttendanceBoardView from './components/AttendanceBoardView.vue';
 import BadgeCenterView from './components/BadgeCenterView.vue';
 import BadgeConfigView from './components/BadgeConfigView.vue';
+import SupervisorDashboardView from './components/SupervisorDashboardView.vue';
 
 const store = useAppStore();
 
@@ -86,6 +87,7 @@ const viewMap: Record<string, Component> = {
   'attendance-board': AttendanceBoardView,
   'badge-center': BadgeCenterView,
   'badge-config': BadgeConfigView,
+  'supervisor-dashboard': SupervisorDashboardView,
 };
 
 const currentComponent = computed<Component>(() => viewMap[store.currentView] || LoginView);

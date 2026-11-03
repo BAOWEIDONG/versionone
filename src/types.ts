@@ -23,6 +23,8 @@ export interface Account {
   campIds?: string[];
   /** 是否启用（禁用后该手机号无法登录） */
   active: boolean;
+  /** 督导权限：仅此类账号可进入督导看板（可看全部学员与营养师/教练批注情况） */
+  supervisor?: boolean;
   createdAt: string;   // 创建时间 YYYY-MM-DD HH:mm:ss
 }
 
@@ -46,6 +48,8 @@ export interface User {
   medicalHistory?: string;
   allergies?: string;
   medicalReports?: MedicalReport[];
+  /** 督导权限标记（登录时由账户带入） */
+  supervisor?: boolean;
 }
 
 export interface WeightRecord {
