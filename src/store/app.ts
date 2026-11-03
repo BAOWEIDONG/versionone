@@ -441,9 +441,7 @@ export const useAppStore = defineStore('app', () => {
         const qSaved = localStorage.getItem('submitted_questionnaire');
         questionnaireAnswered.value = !!qSaved;
         // 根据角色和问卷状态跳转到对应首页
-        if (data.user.supervisor) {
-          viewHistory.value = ['supervisor-dashboard'];
-        } else if (data.user.role === 'coach') {
+        if (data.user.role === 'coach') {
           viewHistory.value = ['coach-dashboard'];
         } else if (data.user.role === 'dietitian') {
           viewHistory.value = ['dietitian-dashboard'];
@@ -476,7 +474,7 @@ export const useAppStore = defineStore('app', () => {
   const DETAIL_FLOW_VIEWS: View[] = ['dietitian-student-detail', 'coach-student-detail', 'pointsDetail'];
 
   function setCurrentView(view: View) {
-    // 督导看板仅限带督导权限的账号进入
+    // 运营总览仅限带督导权限的账号进入
     if (view === 'supervisor-dashboard' && !user.value?.supervisor) return;
     const current = viewHistory.value[viewHistory.value.length - 1];
     if (current === view) return;

@@ -6,7 +6,7 @@ import { Users, UserCircle, LogOut, CheckCircle, XCircle, Search, X, FileText, S
 import { Tabbar as VanTabbar, TabbarItem as VanTabbarItem, Popup as VanPopup } from 'vant';
 import { rankStudents } from '../lib/scoring';
 import { format, subDays } from 'date-fns';
-import { CalendarDays, ChevronRight as ChevronRightIcon } from 'lucide-vue-next';
+import { CalendarDays, ChevronRight as ChevronRightIcon, BarChart3 } from 'lucide-vue-next';
 
 const store = useAppStore();
 
@@ -213,6 +213,20 @@ const maskPhone = (phone: string) => phone.replace(/(\d{3})\d{4}(\d{4})/, '$1***
         </div>
         <div class="flex items-center justify-end mt-2 text-[10px] text-[#FF976A] font-bold">
           查看每位学员明细 <ChevronRightIcon class="w-3.5 h-3.5" />
+        </div>
+      </Card>
+
+      <!-- 运营总览：仅督导权限账号可见 -->
+      <Card v-if="store.user?.supervisor" class="p-4 cursor-pointer border-0 shadow-sm bg-gradient-to-br from-[#1F4E79]/10 to-white active:scale-[0.99] transition-transform" @click="store.setCurrentView('supervisor-dashboard')">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-[#1F4E79]/10 flex items-center justify-center shrink-0">
+            <BarChart3 class="w-4 h-4 text-[#1F4E79]" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-bold text-gray-900">运营总览</div>
+            <div class="text-[10px] text-gray-500">学员打卡数据 + 营养师/教练批注情况</div>
+          </div>
+          <ChevronRightIcon class="w-4 h-4 text-[#1F4E79]" />
         </div>
       </Card>
 
