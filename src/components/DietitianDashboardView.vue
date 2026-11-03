@@ -224,7 +224,7 @@ const maskPhone = (phone: string) => phone.replace(/(\d{3})\d{4}(\d{4})/, '$1***
           </div>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-bold text-gray-900">运营总览</div>
-            <div class="text-[10px] text-gray-500">学员打卡数据 + 营养师/教练批注情况</div>
+            <div class="text-[10px] text-gray-500">营养师/教练批注情况与完成率</div>
           </div>
           <ChevronRightIcon class="w-4 h-4 text-[#1F4E79]" />
         </div>

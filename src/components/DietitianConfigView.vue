@@ -83,7 +83,7 @@ interface ConfigItem {
 const configItems = computed<ConfigItem[]>(() => [
   // 仅督导权限账号可见：全局运营数据入口
   ...(store.user?.supervisor
-    ? [{ view: 'supervisor-dashboard', title: '运营总览', desc: '学员打卡与团队批注全局数据', icon: BarChart3, color: '#1F4E79' }]
+    ? [{ view: 'supervisor-dashboard', title: '运营总览', desc: '营养师/教练批注情况与完成率', icon: BarChart3, color: '#1F4E79' }]
     : []),
   // 首期上线版暂移除以下入口，后续版本上线
   // { view: 'meal-time-config', title: '打卡时间', desc: '每餐打卡时间区间', icon: Clock, color: '#FF976A' },

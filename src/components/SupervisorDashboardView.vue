@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { format, subDays, addDays } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { useAppStore } from '../store/app';
 import { Card } from './ui';
-import { LogOut, ChevronDown, Download, Users, CheckCircle2, ChevronRight, UserCheck, CalendarDays } from 'lucide-vue-next';
+import { ChevronDown, Download, Users, ChevronRight, UserCheck } from 'lucide-vue-next';
 import { Popup as VanPopup, showToast } from 'vant';
 
 const store = useAppStore();
@@ -39,94 +39,10 @@ const dateRange = computed(() => {
   return { from, to: to < from ? from : to };
 });
 
-/** 范围内日期列表（最多 366 天，避免异常配置） */
-const dayKeys = computed(() => {
-  const { from, to } = dateRange.value;
-  const out: string[] = [];
-  let d = new Date(`${from}T00:00:00`);
-  const end = new Date(`${to}T00:00:00`);
-  let guard = 0;
-  while (d <= end && guard < 366) {
-    out.push(format(d, 'yyyy-MM-dd'));
-    d = addDays(d, 1);
-    guard++;
-  }
-  return out;
-});
-
 const inRange = (dateStr: string) => {
   const d = dateStr.substring(0, 10);
   return d >= dateRange.value.from && d <= dateRange.value.to;
 };
-
-// ─── 学员打卡（按人次：学员 × 天） ───
-const campStudents = computed(() => (activeCampId.value ? store.getStudentsByCamp(activeCampId.value) : []));
-
-const checkin = computed(() => {
-  const students = campStudents.value;
-  const days = dayKeys.value;
-  const diet = activeCampId.value ? store.getCampDietRecords(activeCampId.value) : [];
-  const ex = activeCampId.value ? store.getCampExerciseRecords(activeCampId.value) : [];
-  const wt = activeCampId.value ? store.getCampWeightRecords(activeCampId.value) : [];
-
-  const dietBy = new Map<string, Map<string, Set<string>>>();
-  diet.forEach((r) => {
-    if (!r.studentId) return;
-    const d = r.date.substring(0, 10);
-    if (!dietBy.has(r.studentId)) dietBy.set(r.studentId, new Map());
-    const m = dietBy.get(r.studentId)!;
-    if (!m.has(d)) m.set(d, new Set());
-    m.get(d)!.add(r.meal);
-  });
-  const exBy = new Map<string, Set<string>>();
-  ex.forEach((r) => {
-    if (!r.studentId) return;
-    if (!exBy.has(r.studentId)) exBy.set(r.studentId, new Set());
-    exBy.get(r.studentId)!.add(r.date.substring(0, 10));
-  });
-  const wtBy = new Map<string, Set<string>>();
-  wt.forEach((r) => {
-    if (!r.studentId) return;
-    if (!wtBy.has(r.studentId)) wtBy.set(r.studentId, new Set());
-    wtBy.get(r.studentId)!.add(r.date.substring(0, 10));
-  });
-
-  const itemCounts = { breakfast: 0, lunch: 0, dinner: 0, exercise: 0, weight: 0 };
-  let required = 0;
-  let checked = 0;
-  let all = 0;
-  const rows = students.map((s) => {
-    let checkedDays = 0;
-    let allDays = 0;
-    for (const d of days) {
-      required++;
-      const meals = dietBy.get(s.id)?.get(d) || new Set<string>();
-      const items = [meals.has('breakfast'), meals.has('lunch'), meals.has('dinner'), exBy.get(s.id)?.has(d) || false, wtBy.get(s.id)?.has(d) || false];
-      const n = items.filter(Boolean).length;
-      if (items[0]) itemCounts.breakfast++;
-      if (items[1]) itemCounts.lunch++;
-      if (items[2]) itemCounts.dinner++;
-      if (items[3]) itemCounts.exercise++;
-      if (items[4]) itemCounts.weight++;
-      if (n > 0) { checked++; checkedDays++; }
-      if (n === 5) { all++; allDays++; }
-    }
-    return {
-      ...s,
-      totalDays: days.length,
-      checkedDays,
-      allDays,
-      rate: days.length ? Math.round((checkedDays / days.length) * 100) : 0,
-    };
-  });
-
-  return {
-    required, checked, unchecked: required - checked, all,
-    rate: required ? Math.round((checked / required) * 100) : 0,
-    allRate: required ? Math.round((all / required) * 100) : 0,
-    itemCounts, rows,
-  };
-});
 
 // ─── 批注记录 ───
 interface Annotation { name: string; date: string }
@@ -142,6 +58,7 @@ interface Entry {
   annotations: Annotation[];
 }
 
+const campStudents = computed(() => (activeCampId.value ? store.getStudentsByCamp(activeCampId.value) : []));
 const studentName = (id: string) => campStudents.value.find((s) => s.id === id)?.name || id;
 
 const annotationsOf = (rec: any, role: 'dietitian' | 'coach'): Annotation[] => {
@@ -179,7 +96,7 @@ const overview = computed(() => {
   return { required, annotated, pending: required - annotated, rate: required ? Math.round((annotated / required) * 100) : 0 };
 });
 
-// ─── 批注类型明细（饮食 / 体重 / 运动） ───
+// ─── 批注类型明细 ───
 const typeOverview = computed(() => {
   const defs = [
     { key: 'diet', label: '饮食', color: '#FF976A' },
@@ -193,7 +110,7 @@ const typeOverview = computed(() => {
   });
 });
 
-// ─── 团队工作量（按实际批注人，拆到类型） ───
+// ─── 人员批注量（按实际批注人，拆到类型） ───
 const staffStats = computed(() => {
   const staff = store.accounts.filter((a) => a.active && (a.role === 'dietitian' || a.role === 'coach') && !a.supervisor);
   return staff.map((a) => {
@@ -220,36 +137,21 @@ const staffStats = computed(() => {
   }).sort((x, y) => y.count - x.count);
 });
 
-// ─── 学员明细：打卡 + 批注覆盖（合并一张表） ───
-const studentRows = computed(() => checkin.value.rows.map((r) => {
-  const list = entries.value.filter((e) => e.studentId === r.id);
+// ─── 学员批注覆盖 ───
+const studentRows = computed(() => campStudents.value.map((s) => {
+  const list = entries.value.filter((e) => e.studentId === s.id);
   const by = (t: Entry['type']) => {
     const sub = list.filter((e) => e.type === t);
     return { required: sub.length, annotated: sub.filter((e) => e.annotations.length > 0).length };
   };
   return {
-    ...r,
+    ...s,
     dietAnn: by('diet'),
     weightAnn: by('weight'),
     exerciseAnn: by('exercise'),
     unannotated: list.filter((e) => e.annotations.length === 0).length,
   };
 }).sort((a, b) => b.unannotated - a.unannotated));
-
-const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
-
-// 项目维度行（避免模板里做类型断言）
-const itemRows = computed(() => {
-  const c = checkin.value;
-  const defs = [
-    { key: 'breakfast', label: '早餐', color: '#FF976A' },
-    { key: 'lunch', label: '中餐', color: '#FF976A' },
-    { key: 'dinner', label: '晚餐', color: '#FF976A' },
-    { key: 'exercise', label: '运动', color: '#1677FF' },
-    { key: 'weight', label: '体重', color: '#07C160' },
-  ] as const;
-  return defs.map((d) => ({ ...d, count: c.itemCounts[d.key], percent: pct(c.itemCounts[d.key], c.required) }));
-});
 
 const openStudent = (id: string) => {
   store.setSelectedStudentId(id);
@@ -259,17 +161,17 @@ const openStudent = (id: string) => {
 // ─── 导出 CSV ───
 const exportCsv = () => {
   const lines: string[][] = [];
-  lines.push(['运营总览', camp.value?.name || '', `${dateRange.value.from} ~ ${dateRange.value.to}`]);
+  lines.push(['运营总览（批注情况）', camp.value?.name || '', `${dateRange.value.from} ~ ${dateRange.value.to}`]);
   lines.push([]);
-  lines.push(['学员打卡（人次）']);
-  lines.push(['应打卡人次', '已打卡人次', '全项完成人次', '打卡率', '全项率']);
-  lines.push([String(checkin.value.required), String(checkin.value.checked), String(checkin.value.all), `${checkin.value.rate}%`, `${checkin.value.allRate}%`]);
+  lines.push(['批注整体']);
+  lines.push(['应批注', '已批注', '待批注', '批注率']);
+  lines.push([String(overview.value.required), String(overview.value.annotated), String(overview.value.pending), `${overview.value.rate}%`]);
   lines.push([]);
   lines.push(['批注类型明细']);
   lines.push(['类型', '应批注', '已批注', '待批注', '批注率']);
   typeOverview.value.forEach((t) => lines.push([t.label, String(t.required), String(t.annotated), String(t.pending), `${t.rate}%`]));
   lines.push([]);
-  lines.push(['团队批注工作量（按类型）']);
+  lines.push(['人员批注量（按类型）']);
   lines.push(['姓名', '角色', '饮食', '体重', '运动', '合计', '平均响应(小时)']);
   staffStats.value.forEach((s) => lines.push([
     s.name, s.roleLabel,
@@ -279,12 +181,10 @@ const exportCsv = () => {
     String(s.count), s.avgHours === null ? '' : String(s.avgHours),
   ]));
   lines.push([]);
-  lines.push(['学员明细：打卡 + 批注覆盖']);
-  lines.push(['学员', '已打卡天数/应打卡', '全项天数', '饮食批注/应', '体重批注/应', '运动批注/应', '待批注条数']);
+  lines.push(['学员批注覆盖']);
+  lines.push(['学员', '饮食批注/应', '体重批注/应', '运动批注/应', '待批注条数']);
   studentRows.value.forEach((s) => lines.push([
     s.name,
-    `${s.checkedDays}/${s.totalDays}`,
-    String(s.allDays),
     `${s.dietAnn.annotated}/${s.dietAnn.required}`,
     `${s.weightAnn.annotated}/${s.weightAnn.required}`,
     `${s.exerciseAnn.annotated}/${s.exerciseAnn.required}`,
@@ -294,7 +194,7 @@ const exportCsv = () => {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `运营总览_${camp.value?.name || ''}_${dateRange.value.from}_${dateRange.value.to}.csv`;
+  a.download = `运营总览_批注_${camp.value?.name || ''}_${dateRange.value.from}_${dateRange.value.to}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
   showToast({ message: '已导出 CSV', duration: 1500 });
@@ -308,7 +208,7 @@ const exportCsv = () => {
       <div class="flex items-center justify-between">
         <div>
           <h2 class="text-xl font-black text-gray-900">运营总览</h2>
-          <p class="text-[11px] text-gray-500 mt-0.5">学员打卡 + 营养师/教练批注情况</p>
+          <p class="text-[11px] text-gray-500 mt-0.5">营养师 / 教练批注情况</p>
         </div>
         <div class="flex items-center gap-1">
           <button @click="exportCsv" class="p-2 rounded-full bg-white/70 text-[#1F4E79] active:bg-white"><Download class="w-5 h-5" /></button>
@@ -330,48 +230,7 @@ const exportCsv = () => {
     </div>
 
     <div class="px-5 space-y-4">
-      <!-- 学员打卡概览 -->
-      <div class="flex items-center justify-between px-1">
-        <span class="text-xs font-bold text-gray-700 flex items-center gap-1.5"><CalendarDays class="w-3.5 h-3.5 text-[#FF976A]" /> 学员打卡</span>
-        <span class="text-[10px] text-gray-400">按人次：{{ campStudents.length }} 人 × {{ dayKeys.length }} 天</span>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <Card class="p-4">
-          <div class="text-2xl font-black text-gray-900">{{ checkin.checked }}<span class="text-sm font-normal text-gray-400">/{{ checkin.required }}</span></div>
-          <div class="text-[11px] text-gray-500 mt-1">已打卡人次 · {{ checkin.rate }}%</div>
-          <div class="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full rounded-full bg-[#FF976A]" :style="{ width: checkin.rate + '%' }"></div></div>
-          <div class="text-[10px] text-gray-400 mt-1">未打卡 {{ checkin.unchecked }} 人次</div>
-        </Card>
-        <Card class="p-4">
-          <div class="text-2xl font-black text-[#07C160]">{{ checkin.all }}<span class="text-sm font-normal text-gray-400">/{{ checkin.required }}</span></div>
-          <div class="text-[11px] text-gray-500 mt-1">全项完成人次 · {{ checkin.allRate }}%</div>
-          <div class="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full rounded-full bg-[#07C160]" :style="{ width: checkin.allRate + '%' }"></div></div>
-          <div class="text-[10px] text-gray-400 mt-1">部分完成 {{ checkin.checked - checkin.all }} 人次</div>
-        </Card>
-      </div>
-
-      <!-- 项目维度 -->
-      <Card class="p-4">
-        <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-          <Users class="w-4 h-4 text-[#FF976A]" /> 各项目打卡人次
-          <span class="ml-auto text-[10px] text-gray-400 font-normal">共 {{ checkin.required }} 人次</span>
-        </h3>
-        <div class="space-y-2.5">
-          <div v-for="it in itemRows" :key="it.key" class="flex items-center gap-2">
-            <span class="text-xs text-gray-600 w-10 shrink-0">{{ it.label }}</span>
-            <div class="flex-1 h-2.5 rounded-full bg-gray-100 overflow-hidden">
-              <div class="h-full rounded-full" :style="{ width: it.percent + '%', background: it.color }"></div>
-            </div>
-            <span class="text-xs text-gray-700 w-24 text-right shrink-0 font-medium">{{ it.count }}/{{ checkin.required }} · {{ it.percent }}%</span>
-          </div>
-        </div>
-      </Card>
-
-      <!-- 团队批注概览 -->
-      <div class="flex items-center justify-between px-1 pt-1">
-        <span class="text-xs font-bold text-gray-700 flex items-center gap-1.5"><UserCheck class="w-3.5 h-3.5 text-[#1F4E79]" /> 团队批注</span>
-        <span class="text-[10px] text-gray-400">按记录条数</span>
-      </div>
+      <!-- 批注概览 -->
       <div class="grid grid-cols-4 gap-2">
         <Card class="p-3 text-center">
           <div class="text-lg font-black text-gray-900">{{ overview.required }}</div>
@@ -422,9 +281,11 @@ const exportCsv = () => {
         </div>
       </Card>
 
-      <!-- 团队工作量 -->
+      <!-- 人员批注量 -->
       <Card class="p-4">
-        <h3 class="text-sm font-bold text-gray-900 mb-2">人员批注量（按类型）</h3>
+        <h3 class="text-sm font-bold text-gray-900 mb-2 flex items-center gap-2">
+          <UserCheck class="w-4 h-4 text-[#1F4E79]" /> 人员批注量（按类型）
+        </h3>
         <div class="overflow-x-auto">
           <table class="w-full text-[11px] min-w-[520px]">
             <thead>
@@ -455,23 +316,21 @@ const exportCsv = () => {
         <div v-if="staffStats.length === 0" class="text-center text-xs text-gray-400 py-4">暂无营养师/教练账号</div>
       </Card>
 
-      <!-- 学员明细 -->
+      <!-- 学员批注覆盖 -->
       <Card class="p-4">
         <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-          <Users class="w-4 h-4 text-[#1677FF]" /> 学员明细
-          <span class="ml-auto text-[10px] text-gray-400 font-normal">打卡 + 批注 · 点击看详情</span>
+          <Users class="w-4 h-4 text-[#1677FF]" /> 学员批注覆盖
+          <span class="ml-auto text-[10px] text-gray-400 font-normal">点击看学员详情</span>
         </h3>
         <div class="space-y-2">
           <div v-for="s in studentRows" :key="s.id" class="p-3 rounded-xl bg-gray-50 active:bg-gray-100 cursor-pointer" @click="openStudent(s.id)">
             <div class="flex items-center gap-2">
               <span class="text-sm font-bold text-gray-900">{{ s.name }}</span>
-              <span class="text-[10px] text-gray-500">打卡 {{ s.checkedDays }}/{{ s.totalDays }} 天 · 全项 {{ s.allDays }} 天</span>
               <span v-if="s.unannotated > 0" class="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-orange-50 text-[#FF976A] font-bold">{{ s.unannotated }} 条待批注</span>
               <span v-else class="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-[#07C160]/10 text-[#07C160] font-bold">批注完成</span>
               <ChevronRight class="w-3.5 h-3.5 text-gray-300" />
             </div>
             <div class="flex items-center gap-3 mt-2 text-[10px] text-gray-500">
-              <span class="w-14 text-gray-400">打卡率 {{ s.rate }}%</span>
               <span>饮食 <span class="font-bold text-gray-700">{{ s.dietAnn.annotated }}/{{ s.dietAnn.required }}</span></span>
               <span>体重 <span class="font-bold text-gray-700">{{ s.weightAnn.annotated }}/{{ s.weightAnn.required }}</span></span>
               <span>运动 <span class="font-bold text-gray-700">{{ s.exerciseAnn.annotated }}/{{ s.exerciseAnn.required }}</span></span>
