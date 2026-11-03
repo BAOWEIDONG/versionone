@@ -43,6 +43,7 @@ import AttendanceBoardView from './components/AttendanceBoardView.vue';
 import BadgeCenterView from './components/BadgeCenterView.vue';
 import BadgeConfigView from './components/BadgeConfigView.vue';
 import SupervisorDashboardView from './components/SupervisorDashboardView.vue';
+import { useEdgeSwipeBack } from './composables/useEdgeSwipeBack';
 
 const store = useAppStore();
 
@@ -94,6 +95,14 @@ const currentComponent = computed<Component>(() => viewMap[store.currentView] ||
 
 // 视图切换时滚动到顶部
 const scrollContainer = ref<HTMLElement | null>(null);
+const pageRef = ref<HTMLElement | null>(null);
+
+// 微信内：左侧边缘右滑返回
+useEdgeSwipeBack({
+  canGoBack: () => store.canGoBack,
+  onBack: () => store.goBack(),
+  target: pageRef,
+});
 watch(() => store.currentView, () => {
   nextTick(() => {
     scrollContainer.value?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
@@ -117,7 +126,7 @@ onMounted(() => {
 <template>
   <div class="fixed inset-0 max-w-md mx-auto overflow-hidden font-sans text-gray-700 sm:shadow-2xl sm:border-x sm:border-gray-100">
     <div ref="scrollContainer" class="absolute inset-0 overflow-y-auto overflow-x-hidden overscroll-contain" style="-webkit-overflow-scrolling: touch; touch-action: pan-y;">
-      <div class="relative">
+      <div ref="pageRef" class="relative">
         <component :is="currentComponent" :key="store.currentView" />
       </div>
     </div>

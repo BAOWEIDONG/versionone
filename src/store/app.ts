@@ -320,6 +320,8 @@ export const useAppStore = defineStore('app', () => {
   }
   const viewHistory = ref<View[]>(['login']);
   const currentView = computed<View>(() => viewHistory.value[viewHistory.value.length - 1]);
+  /** 是否还有上一页（用于边缘滑动返回判断） */
+  const canGoBack = computed(() => viewHistory.value.length > 1);
 
   const questionnaireAnswered = ref(false);
   const students = ref<typeof MOCK_STUDENTS>([...MOCK_STUDENTS]);
@@ -1022,6 +1024,7 @@ export const useAppStore = defineStore('app', () => {
     getActivityConfig,
     updateActivityConfig,
     currentView,
+    canGoBack,
     init,
     questionnaireAnswered,
     students,
