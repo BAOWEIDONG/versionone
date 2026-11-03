@@ -125,7 +125,17 @@ function loadPersistedAccounts(): Account[] | null {
     const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
     if (!raw) return null;
     const list = JSON.parse(raw);
-    if (Array.isArray(list) && list.length > 0) return list as Account[];
+    if (Array.isArray(list) && list.length > 0) {
+      const merged = list as Account[];
+      // 合并新增的种子账户（如体验账号），保留本地已有的授权/修改
+      for (const seedAcc of MOCK_ACCOUNTS) {
+        if (!merged.some((a) => a.id === seedAcc.id)) merged.push(seedAcc);
+      }
+      // 体验学员统一归属第一期，保证登录即见完整演示数据
+      const demoStudent = merged.find((a) => a.id === 's13');
+      if (demoStudent) demoStudent.campIds = ['camp1'];
+      return merged;
+    }
   } catch { /* ignore */ }
   return null;
 }
