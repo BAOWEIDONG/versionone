@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { storage } from '../lib/storage';
 import { computed, ref, onUnmounted } from 'vue';
 import { format } from 'date-fns';
 import { useAppStore } from '../store/app';
@@ -33,7 +34,7 @@ const MSG_SEEN_KEY = 'camp_msg_seen';
 function loadSeenState(): SeenState {
   if (!store.user) return { rewards: {}, ranks: {} };
   try {
-    const raw = localStorage.getItem(MSG_SEEN_KEY);
+    const raw = storage.getItem(MSG_SEEN_KEY);
     if (!raw) return { rewards: {}, ranks: {} };
     const all = JSON.parse(raw);
     return all[store.user.id] || { rewards: {}, ranks: {} };
@@ -61,11 +62,11 @@ function saveSeenState() {
     if (me) rank = me.rank;
   }
   try {
-    const raw = localStorage.getItem(MSG_SEEN_KEY);
+    const raw = storage.getItem(MSG_SEEN_KEY);
     const all = raw ? JSON.parse(raw) : {};
     const prev = all[uid] || { rewards: {}, ranks: {} };
     all[uid] = { rewards, ranks: { ...prev.ranks, [campKey]: rank } };
-    localStorage.setItem(MSG_SEEN_KEY, JSON.stringify(all));
+    storage.setItem(MSG_SEEN_KEY, JSON.stringify(all));
   } catch { /* ignore */ }
 }
 

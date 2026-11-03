@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { storage } from '../lib/storage';
 import { computed, ref, onMounted, watch } from 'vue';
 import { format } from 'date-fns';
 import { useAppStore } from '../store/app';
@@ -235,7 +236,7 @@ const weeklyChallengePreview = computed(() => {
 const yesterdayStr = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd');
 // 同步读取 localStorage，避免返回首页时弹窗闪现
 const _dailySummaryKey = `daily_summary_${store.user?.id || 'anon'}_${todayStr}`;
-const dailySummaryDismissed = ref(!!localStorage.getItem(_dailySummaryKey));
+const dailySummaryDismissed = ref(!!storage.getItem(_dailySummaryKey));
 
 const SUMMARY_ITEMS = [
   { key: 'breakfast' as const, label: '早餐' },
@@ -316,7 +317,7 @@ const dailySummaryWeightColor = computed(() => {
 });
 const dismissDailySummary = () => {
   dailySummaryDismissed.value = true;
-  localStorage.setItem(_dailySummaryKey, '1');
+  storage.setItem(_dailySummaryKey, '1');
 };
 
 // ---- 今日打卡状态 ----
@@ -388,13 +389,13 @@ const dismissAchievementNotify = () => {
     campWt.value.filter(isMine),
   ).achievements.filter((a) => a.unlocked).map((a) => a.id);
   prevAchievementIds.value = new Set(all);
-  localStorage.setItem(key, JSON.stringify(all));
+  storage.setItem(key, JSON.stringify(all));
   // 同时记录里程碑阈值
   const mKey = `seen_ms_v2_${store.user?.id || 'anon'}`;
   const mThresholds = computeWeightMilestones(myWeightRecords.value, startWeight.value)
     .filter(m => m.achieved).map(m => m.threshold);
   prevMilestoneThresholds.value = new Set(mThresholds);
-  localStorage.setItem(mKey, JSON.stringify(mThresholds));
+  storage.setItem(mKey, JSON.stringify(mThresholds));
 };
 
 // 检测新解锁的成就
@@ -486,7 +487,7 @@ onMounted(() => {
     // 使用版本化 key，避免旧版 mock 数据残留的 baseline 干扰
     const key = `seen_ach_v2_${store.user.id}`;
     let seenIds: string[] = [];
-    try { seenIds = JSON.parse(localStorage.getItem(key) || '[]'); } catch { /* */ }
+    try { seenIds = JSON.parse(storage.getItem(key) || '[]'); } catch { /* */ }
     if (seenIds.length > 0) {
       prevAchievementIds.value = new Set(seenIds);
     } else {
@@ -501,19 +502,19 @@ onMounted(() => {
       );
       const unlocked = report.achievements.filter((a) => a.unlocked).map((a) => a.id);
       prevAchievementIds.value = new Set(unlocked);
-      localStorage.setItem(key, JSON.stringify(unlocked));
+      storage.setItem(key, JSON.stringify(unlocked));
     }
     // 同步初始化里程碑 baseline
     const mKey = `seen_ms_v2_${store.user.id}`;
     let seenMs: number[] = [];
-    try { seenMs = JSON.parse(localStorage.getItem(mKey) || '[]'); } catch { /* */ }
+    try { seenMs = JSON.parse(storage.getItem(mKey) || '[]'); } catch { /* */ }
     if (seenMs.length > 0) {
       prevMilestoneThresholds.value = new Set(seenMs);
     } else {
       const ms = computeWeightMilestones(myWeightRecords.value, startWeight.value)
         .filter(m => m.achieved).map(m => m.threshold);
       prevMilestoneThresholds.value = new Set(ms);
-      localStorage.setItem(mKey, JSON.stringify(ms));
+      storage.setItem(mKey, JSON.stringify(ms));
     }
 
     // 如果刚完成打卡，立即检测新成就（不被昨日小结阻塞）

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { storage } from '../lib/storage';
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { format } from 'date-fns';
 import { useAppStore } from '../store/app';
@@ -247,7 +248,7 @@ watch(selectedCampId, () => {
 const qData = ref<any>(null);
 
 onMounted(() => {
-  const saved = localStorage.getItem('submitted_questionnaire') || localStorage.getItem('draft_questionnaire');
+  const saved = storage.getItem('submitted_questionnaire') || storage.getItem('draft_questionnaire');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);

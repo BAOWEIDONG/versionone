@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { storage } from '../lib/storage';
 import { ref, computed, onMounted } from 'vue';
 import { useAppStore } from '../store/app';
 import { uploadFile } from '../lib/api';
@@ -63,7 +64,7 @@ function normalizeQData(raw: any): any {
 }
 
 onMounted(() => {
-  const saved = localStorage.getItem('submitted_questionnaire') || localStorage.getItem('draft_questionnaire');
+  const saved = storage.getItem('submitted_questionnaire') || storage.getItem('draft_questionnaire');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -76,7 +77,7 @@ onMounted(() => {
 
 function persistQuestionnaire(data: any) {
   try {
-    localStorage.setItem('submitted_questionnaire', JSON.stringify(data));
+    storage.setItem('submitted_questionnaire', JSON.stringify(data));
   } catch (e) {
     // ignore
   }
@@ -107,7 +108,7 @@ const handleConfirmUpload = () => {
   const newQData = { ...(qData.value || {}), medicalReports: updated };
   qData.value = newQData;
   try {
-    localStorage.setItem('submitted_questionnaire', JSON.stringify(newQData));
+    storage.setItem('submitted_questionnaire', JSON.stringify(newQData));
   } catch (e) {
     // ignore
   }

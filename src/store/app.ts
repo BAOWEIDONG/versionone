@@ -23,6 +23,7 @@ import * as api from '../lib/api';
 import { calculateTotalScore } from '../lib/scoring';
 import { computeBadgeRecords, computeOneTimeBadgeRecords } from '../lib/badges';
 import { generateStudentReport } from '../lib/campReport';
+import { storage } from '../lib/storage';
 
 /** 生成 yyyy-MM-dd HH:mm:ss 格式的当前时间字符串（全站统一格式） */
 function formatDateTimeStr(): string {
@@ -122,19 +123,19 @@ const ACCOUNTS_DELETED_KEY = 'camp_accounts_deleted_v1';
 
 function loadDeletedAccountIds(): Set<string> {
   try {
-    const raw = localStorage.getItem(ACCOUNTS_DELETED_KEY);
+    const raw = storage.getItem(ACCOUNTS_DELETED_KEY);
     const list = raw ? JSON.parse(raw) : [];
     return new Set(Array.isArray(list) ? list : []);
   } catch { return new Set(); }
 }
 function persistDeletedAccountIds(ids: Set<string>) {
-  try { localStorage.setItem(ACCOUNTS_DELETED_KEY, JSON.stringify([...ids])); } catch { /* ignore */ }
+  try { storage.setItem(ACCOUNTS_DELETED_KEY, JSON.stringify([...ids])); } catch { /* ignore */ }
 }
 
 /** 读取本地持久化的账户列表（含运营总览权限等后台配置） */
 function loadPersistedAccounts(): Account[] | null {
   try {
-    const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+    const raw = storage.getItem(ACCOUNTS_STORAGE_KEY);
     if (!raw) return null;
     const list = JSON.parse(raw);
     if (Array.isArray(list) && list.length > 0) {
@@ -156,7 +157,7 @@ function loadPersistedAccounts(): Account[] | null {
 /** 持久化账户列表 */
 function persistAccounts(list: Account[]) {
   try {
-    localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(list));
+    storage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(list));
   } catch { /* ignore */ }
 }
 
@@ -429,9 +430,9 @@ export const useAppStore = defineStore('app', () => {
         user: u,
         timestamp: Date.now(),
       };
-      localStorage.setItem('camp_auth', JSON.stringify(authData));
+      storage.setItem('camp_auth', JSON.stringify(authData));
     } else {
-      localStorage.removeItem('camp_auth');
+      storage.removeItem('camp_auth');
     }
   }
 
@@ -465,19 +466,19 @@ export const useAppStore = defineStore('app', () => {
     }
     // 重新持久化
     const authData = { user: user.value, timestamp: Date.now() };
-    localStorage.setItem('camp_auth', JSON.stringify(authData));
+    storage.setItem('camp_auth', JSON.stringify(authData));
   }
 
   /** 从 localStorage 恢复登录态（页面刷新/重新打开时自动登录） */
   function restoreAuth(): boolean {
     try {
-      const raw = localStorage.getItem('camp_auth');
+      const raw = storage.getItem('camp_auth');
       if (!raw) return false;
       const data = JSON.parse(raw);
       // 30 天过期
       const maxAge = 30 * 24 * 60 * 60 * 1000;
       if (Date.now() - data.timestamp > maxAge) {
-        localStorage.removeItem('camp_auth');
+        storage.removeItem('camp_auth');
         return false;
       }
       if (data.user && data.user.role) {
@@ -486,12 +487,12 @@ export const useAppStore = defineStore('app', () => {
         const acc = accounts.value.find((a) => a.id === data.user.id || a.phone === data.user.phone);
         if (acc) {
           user.value = { ...user.value, supervisor: acc.supervisor === true };
-          localStorage.setItem('camp_auth', JSON.stringify({ user: user.value, timestamp: Date.now() }));
+          storage.setItem('camp_auth', JSON.stringify({ user: user.value, timestamp: Date.now() }));
         }
         // 默认营期 = 最新一期
         selectedCampId.value = defaultCampIdFor(data.user);
         // 恢复问卷状态
-        const qSaved = localStorage.getItem('submitted_questionnaire');
+        const qSaved = storage.getItem('submitted_questionnaire');
         questionnaireAnswered.value = !!qSaved;
         // 根据角色和问卷状态跳转到对应首页
         if (data.user.role === 'coach') {
@@ -506,7 +507,7 @@ export const useAppStore = defineStore('app', () => {
       }
     } catch (e) {
       // JSON 解析失败，清除无效数据
-      localStorage.removeItem('camp_auth');
+      storage.removeItem('camp_auth');
     }
     return false;
   }
@@ -515,7 +516,7 @@ export const useAppStore = defineStore('app', () => {
   function logout() {
     user.value = null;
     selectedCampId.value = null;
-    localStorage.removeItem('camp_auth');
+    storage.removeItem('camp_auth');
     viewHistory.value = ['login'];
   }
 
