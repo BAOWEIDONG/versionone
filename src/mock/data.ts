@@ -31,7 +31,9 @@ export const MOCK_STUDENTS: { id: string; name: string; age: number; gender: 'ma
   { id: 's8', name: '王强', age: 35, gender: 'male', phone: '13800000008' },
   { id: 's9', name: '刘梅', age: 33, gender: 'female', phone: '13800000009' },
   { id: 's10', name: '孙悟空', age: 30, gender: 'male', phone: '13800000010' },
-  { id: 's11', name: '钱多多', age: 27, gender: 'male', phone: '13800000011' }
+  { id: 's11', name: '钱多多', age: 27, gender: 'male', phone: '13800000011' },
+  // 体验账号：同一手机号可按学员/营养师/教练三种角色登录（登录时选择角色）
+  { id: 's13', name: '体验学员', age: 30, gender: 'female', phone: '13900000009' },
 ];
 
 // 完整打卡天数：今天往前连续 N 天，三餐+运动都完成
@@ -875,6 +877,8 @@ export const MOCK_ACCOUNTS: Account[] = [
   { id: 'c1', phone: '13700000001', name: '李教练', role: 'coach', campIds: ['camp1'], active: true, createdAt: iso(-28, '10:00:00') },
   { id: 'c2', phone: '13700000002', name: '王教练', role: 'coach', campIds: ['camp1', 'camp2'], active: true, createdAt: iso(-28, '10:00:00') },
   { id: 'c3', phone: '13700000003', name: '张教练', role: 'coach', active: true, createdAt: iso(-28, '10:00:00') },
+  // 体验教练：与督导/体验学员同号不同角色
+  { id: 'c4', phone: '13900000009', name: '体验教练', role: 'coach', campIds: ['camp1', 'camp2'], active: true, createdAt: iso(-28, '10:00:00') },
   // 学员（id 与 MOCK_STUDENTS 一致，确保登录后能关联到打卡/体重/检测数据）
   { id: 's1', phone: '13800000001', name: '李明', role: 'student', campIds: ['camp1'], active: true, createdAt: iso(-15, '08:00:00') },
   { id: 's2', phone: '13800000002', name: '王丽', role: 'student', campIds: ['camp1'], active: true, createdAt: iso(-15, '08:00:00') },
@@ -888,6 +892,8 @@ export const MOCK_ACCOUNTS: Account[] = [
   { id: 's10', phone: '13800000010', name: '孙悟空', role: 'student', campIds: ['camp1', 'camp2'], active: true, createdAt: iso(-15, '08:00:00') },
   // 仅属于未开营营期（camp3）的学员，用于演示"营期未开始禁止打卡"
   { id: 's11', phone: '13800000011', name: '钱多多', role: 'student', campIds: ['camp3'], active: true, createdAt: iso(7, '08:00:00') },
+  // 体验学员：与督导/体验教练同号不同角色，登录时选择「学员」
+  { id: 's13', phone: '13900000009', name: '体验学员', role: 'student', campIds: ['camp1', 'camp2'], active: true, createdAt: iso(-15, '08:00:00') },
 ];
 
 /** 积分商城商品 */
