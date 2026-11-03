@@ -287,7 +287,7 @@ const exportCsv = () => {
           <UserCheck class="w-4 h-4 text-[#1F4E79]" /> 人员批注量（按类型）
         </h3>
         <div class="overflow-x-auto">
-          <table class="w-full text-[11px] min-w-[520px]">
+          <table class="w-full text-[11px] min-w-[520px] freeze-first">
             <thead>
               <tr class="text-gray-500 border-b border-gray-100">
                 <th class="text-left py-2 font-medium">人员</th>
@@ -358,6 +358,17 @@ const exportCsv = () => {
 </template>
 
 <style scoped>
+/* 人员批注量：首列冻结，横向滑动时姓名始终可见 */
+.freeze-first th:first-child,
+.freeze-first td:first-child {
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 2;
+  box-shadow: 1px 0 0 #f1f5f9;
+}
+.freeze-first thead th:first-child { z-index: 3; }
+
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
