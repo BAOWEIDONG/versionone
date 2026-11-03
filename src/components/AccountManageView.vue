@@ -229,14 +229,20 @@ const saveAccount = () => {
   const now = new Date();
   const createdAt = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
 
+  const canGrant = store.user?.supervisor === true;
+  const supervisorFlag = role === 'dietitian' ? editingAccount.value.supervisor === true : false;
+
   if (editingAccount.value.id) {
-    store.updateAccount(editingAccount.value.id, {
+    const updates: Partial<Account> = {
       phone: phone.trim(),
       name: name?.trim() || '',
       role,
       campIds: (role === 'student' || role === 'coach') ? campIds : undefined,
       active,
-    });
+    };
+    // 只有督导账号能授予/收回运营总览权限；其他账号保存时不触碰该字段
+    if (canGrant) updates.supervisor = supervisorFlag;
+    store.updateAccount(editingAccount.value.id, updates);
   } else {
     store.addAccount({
       id: `u_${Date.now()}`,
@@ -245,6 +251,7 @@ const saveAccount = () => {
       role: role as Role,
       campIds: (role === 'student' || role === 'coach') ? campIds : undefined,
       active: active ?? true,
+      supervisor: canGrant ? supervisorFlag : false,
       createdAt,
     });
   }
@@ -408,6 +415,7 @@ const switchTab = (role: Role) => {
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1 flex-wrap">
                   <span class="text-sm font-bold text-gray-900">{{ account.name || '未填写' }}</span>
+                  <span v-if="account.supervisor" class="text-[9px] font-medium bg-[#1F4E79]/10 text-[#1F4E79] px-1.5 py-0.5 rounded">运营总览权限</span>
                   <span v-if="!account.name" class="text-[9px] font-medium bg-orange-50 text-orange-500 px-1.5 py-0.5 rounded">待问卷填写</span>
                   <span v-if="!account.active" class="text-[9px] font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                     <ShieldOff class="w-2.5 h-2.5" /> 已禁用
@@ -558,6 +566,21 @@ const switchTab = (role: Role) => {
                 {{ tab.label }}
               </button>
             </div>
+          </div>
+          <!-- 运营总览权限：仅督导账号可见，且仅能授予营养师 -->
+          <div v-if="store.user?.supervisor && editingAccount.role === 'dietitian'" class="flex items-center justify-between bg-[#1F4E79]/5 rounded-lg p-3 border border-[#1F4E79]/10">
+            <div>
+              <div class="text-sm font-medium text-gray-700">运营总览权限</div>
+              <div class="text-[10px] text-gray-400 mt-0.5">开启后可查看学员打卡与团队批注全局数据</div>
+              <div v-if="editingAccount.id === store.user?.id" class="text-[10px] text-orange-500 mt-0.5">不可修改本人权限</div>
+            </div>
+            <VanSwitch
+              :model-value="editingAccount.supervisor === true"
+              @update:model-value="editingAccount.supervisor = $event"
+              :disabled="editingAccount.id === store.user?.id"
+              size="22px"
+              active-color="#1F4E79"
+            />
           </div>
           <!-- 营期关联（学员/教练） -->
           <div v-if="editingAccount.role === 'student' || editingAccount.role === 'coach'">
