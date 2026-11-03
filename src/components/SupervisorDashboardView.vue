@@ -179,24 +179,44 @@ const overview = computed(() => {
   return { required, annotated, pending: required - annotated, rate: required ? Math.round((annotated / required) * 100) : 0 };
 });
 
-// ─── 团队工作量（按实际批注人，不给逐条明细） ───
+// ─── 批注类型明细（饮食 / 体重 / 运动） ───
+const typeOverview = computed(() => {
+  const defs = [
+    { key: 'diet', label: '饮食', color: '#FF976A' },
+    { key: 'weight', label: '体重', color: '#1677FF' },
+    { key: 'exercise', label: '运动', color: '#07C160' },
+  ] as const;
+  return defs.map((d) => {
+    const list = entries.value.filter((e) => e.type === d.key);
+    const annotated = list.filter((e) => e.annotations.length > 0).length;
+    return { ...d, required: list.length, annotated, pending: list.length - annotated, rate: list.length ? Math.round((annotated / list.length) * 100) : 0 };
+  });
+});
+
+// ─── 团队工作量（按实际批注人，拆到类型） ───
 const staffStats = computed(() => {
   const staff = store.accounts.filter((a) => a.active && (a.role === 'dietitian' || a.role === 'coach') && !a.supervisor);
   return staff.map((a) => {
     let count = 0;
+    let dietCount = 0;
+    let weightCount = 0;
+    let exerciseCount = 0;
     let hours = 0;
     let timed = 0;
     for (const e of entries.value) {
       for (const ann of e.annotations) {
         if (ann.name !== a.name) continue;
         count++;
+        if (e.type === 'diet') dietCount++;
+        else if (e.type === 'weight') weightCount++;
+        else exerciseCount++;
         if (ann.date) {
           const diff = (new Date(ann.date).getTime() - new Date(e.date).getTime()) / 3600000;
           if (Number.isFinite(diff) && diff >= 0) { hours += diff; timed++; }
         }
       }
     }
-    return { id: a.id, name: a.name, roleLabel: a.role === 'dietitian' ? '营养师' : '教练', count, avgHours: timed ? Math.round((hours / timed) * 10) / 10 : null };
+    return { id: a.id, name: a.name, roleLabel: a.role === 'dietitian' ? '营养师' : '教练', count, dietCount, weightCount, exerciseCount, avgHours: timed ? Math.round((hours / timed) * 10) / 10 : null };
   }).sort((x, y) => y.count - x.count);
 });
 
@@ -245,9 +265,19 @@ const exportCsv = () => {
   lines.push(['应打卡人次', '已打卡人次', '全项完成人次', '打卡率', '全项率']);
   lines.push([String(checkin.value.required), String(checkin.value.checked), String(checkin.value.all), `${checkin.value.rate}%`, `${checkin.value.allRate}%`]);
   lines.push([]);
-  lines.push(['团队批注工作量']);
-  lines.push(['姓名', '角色', '批注条数', '平均响应(小时)']);
-  staffStats.value.forEach((s) => lines.push([s.name, s.roleLabel, String(s.count), s.avgHours === null ? '' : String(s.avgHours)]));
+  lines.push(['批注类型明细']);
+  lines.push(['类型', '应批注', '已批注', '待批注', '批注率']);
+  typeOverview.value.forEach((t) => lines.push([t.label, String(t.required), String(t.annotated), String(t.pending), `${t.rate}%`]));
+  lines.push([]);
+  lines.push(['团队批注工作量（按类型）']);
+  lines.push(['姓名', '角色', '饮食', '体重', '运动', '合计', '平均响应(小时)']);
+  staffStats.value.forEach((s) => lines.push([
+    s.name, s.roleLabel,
+    s.roleLabel === '营养师' ? String(s.dietCount) : '',
+    s.roleLabel === '营养师' ? String(s.weightCount) : '',
+    s.roleLabel === '教练' ? String(s.exerciseCount) : '',
+    String(s.count), s.avgHours === null ? '' : String(s.avgHours),
+  ]));
   lines.push([]);
   lines.push(['学员明细：打卡 + 批注覆盖']);
   lines.push(['学员', '已打卡天数/应打卡', '全项天数', '饮食批注/应', '体重批注/应', '运动批注/应', '待批注条数']);
@@ -361,20 +391,68 @@ const exportCsv = () => {
         </Card>
       </div>
 
+      <!-- 批注类型明细 -->
+      <Card class="p-4">
+        <h3 class="text-sm font-bold text-gray-900 mb-2">批注类型明细</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-[11px] min-w-[340px]">
+            <thead>
+              <tr class="text-gray-500 border-b border-gray-100">
+                <th class="text-left py-2 font-medium">类型</th>
+                <th class="text-right py-2 font-medium">应批注</th>
+                <th class="text-right py-2 font-medium">已批注</th>
+                <th class="text-right py-2 font-medium">待批注</th>
+                <th class="text-right py-2 font-medium">批注率</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="t in typeOverview" :key="t.key" class="border-b border-gray-50 last:border-0">
+                <td class="py-2 text-left">
+                  <span class="inline-flex items-center gap-1.5 text-gray-800 font-medium">
+                    <span class="w-2 h-2 rounded-full" :style="{ background: t.color }"></span>{{ t.label }}
+                  </span>
+                </td>
+                <td class="py-2 text-right text-gray-700">{{ t.required }}</td>
+                <td class="py-2 text-right text-[#07C160] font-bold">{{ t.annotated }}</td>
+                <td class="py-2 text-right" :class="t.pending > 0 ? 'text-[#FF976A] font-bold' : 'text-gray-400'">{{ t.pending }}</td>
+                <td class="py-2 text-right text-gray-700">{{ t.rate }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
       <!-- 团队工作量 -->
       <Card class="p-4">
-        <h3 class="text-sm font-bold text-gray-900 mb-2">人员批注量</h3>
-        <div class="space-y-1">
-          <div v-for="s in staffStats" :key="s.id" class="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-            <div class="w-8 h-8 rounded-full bg-[#1F4E79]/10 text-[#1F4E79] flex items-center justify-center text-xs font-bold shrink-0">{{ s.name.substring(0, 1) }}</div>
-            <div class="flex-1 min-w-0">
-              <div class="text-xs font-bold text-gray-900">{{ s.name }} <span class="text-[9px] text-gray-400 font-normal">{{ s.roleLabel }}</span></div>
-              <div class="text-[10px] text-gray-400">平均响应 {{ s.avgHours === null ? '--' : s.avgHours + ' 小时' }}</div>
-            </div>
-            <div class="text-sm font-black text-gray-900 shrink-0">{{ s.count }}<span class="text-[10px] text-gray-400 font-normal"> 条</span></div>
-          </div>
-          <div v-if="staffStats.length === 0" class="text-center text-xs text-gray-400 py-4">暂无营养师/教练账号</div>
+        <h3 class="text-sm font-bold text-gray-900 mb-2">人员批注量（按类型）</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-[11px] min-w-[520px]">
+            <thead>
+              <tr class="text-gray-500 border-b border-gray-100">
+                <th class="text-left py-2 font-medium">人员</th>
+                <th class="text-right py-2 font-medium">饮食</th>
+                <th class="text-right py-2 font-medium">体重</th>
+                <th class="text-right py-2 font-medium">运动</th>
+                <th class="text-right py-2 font-medium">合计</th>
+                <th class="text-right py-2 font-medium">平均响应</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in staffStats" :key="s.id" class="border-b border-gray-50 last:border-0">
+                <td class="py-2 text-left">
+                  <div class="text-xs font-bold text-gray-900">{{ s.name }}</div>
+                  <div class="text-[9px] text-gray-400">{{ s.roleLabel }}</div>
+                </td>
+                <td class="py-2 text-right" :class="s.roleLabel === '营养师' ? 'text-gray-800 font-bold' : 'text-gray-300'">{{ s.roleLabel === '营养师' ? s.dietCount : '—' }}</td>
+                <td class="py-2 text-right" :class="s.roleLabel === '营养师' ? 'text-gray-800 font-bold' : 'text-gray-300'">{{ s.roleLabel === '营养师' ? s.weightCount : '—' }}</td>
+                <td class="py-2 text-right" :class="s.roleLabel === '教练' ? 'text-gray-800 font-bold' : 'text-gray-300'">{{ s.roleLabel === '教练' ? s.exerciseCount : '—' }}</td>
+                <td class="py-2 text-right text-gray-900 font-black">{{ s.count }}</td>
+                <td class="py-2 text-right text-gray-500">{{ s.avgHours === null ? '--' : s.avgHours + 'h' }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+        <div v-if="staffStats.length === 0" class="text-center text-xs text-gray-400 py-4">暂无营养师/教练账号</div>
       </Card>
 
       <!-- 学员明细 -->
