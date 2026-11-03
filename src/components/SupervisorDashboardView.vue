@@ -121,16 +121,16 @@ const staffStats = computed(() => {
     let hours = 0;
     let timed = 0;
     for (const e of entries.value) {
-      for (const ann of e.annotations) {
-        if (ann.name !== a.name) continue;
-        count++;
-        if (e.type === 'diet') dietCount++;
-        else if (e.type === 'weight') weightCount++;
-        else exerciseCount++;
-        if (ann.date) {
-          const diff = (new Date(ann.date).getTime() - new Date(e.date).getTime()) / 3600000;
-          if (Number.isFinite(diff) && diff >= 0) { hours += diff; timed++; }
-        }
+      // 口径：一条记录只记一次工作量，归属「该记录第一条批注」的批注人
+      const ann = e.annotations[0];
+      if (!ann || ann.name !== a.name) continue;
+      count++;
+      if (e.type === 'diet') dietCount++;
+      else if (e.type === 'weight') weightCount++;
+      else exerciseCount++;
+      if (ann.date) {
+        const diff = (new Date(ann.date).getTime() - new Date(e.date).getTime()) / 3600000;
+        if (Number.isFinite(diff) && diff >= 0) { hours += diff; timed++; }
       }
     }
     return { id: a.id, name: a.name, roleLabel: a.role === 'dietitian' ? '营养师' : '教练', count, dietCount, weightCount, exerciseCount, avgHours: timed ? Math.round((hours / timed) * 10) / 10 : null };
@@ -152,6 +152,12 @@ const studentRows = computed(() => campStudents.value.map((s) => {
     unannotated: list.filter((e) => e.annotations.length === 0).length,
   };
 }).sort((a, b) => b.unannotated - a.unannotated));
+
+// ─── 覆盖学员：范围内至少有一条已被批注的学员 ───
+const coveredStudents = computed(() => {
+  const ids = new Set(entries.value.filter((e) => e.annotations.length > 0).map((e) => e.studentId));
+  return { covered: ids.size, total: campStudents.value.length };
+});
 
 const openStudent = (id: string) => {
   store.setSelectedStudentId(id);
@@ -237,10 +243,6 @@ const exportCsv = () => {
           <div class="text-[10px] text-gray-500 mt-0.5">应批注</div>
         </Card>
         <Card class="p-3 text-center">
-          <div class="text-lg font-black text-[#07C160]">{{ overview.annotated }}</div>
-          <div class="text-[10px] text-gray-500 mt-0.5">已批注</div>
-        </Card>
-        <Card class="p-3 text-center">
           <div class="text-lg font-black text-[#FF976A]">{{ overview.pending }}</div>
           <div class="text-[10px] text-gray-500 mt-0.5">待批注</div>
         </Card>
@@ -248,7 +250,14 @@ const exportCsv = () => {
           <div class="text-lg font-black text-[#1F4E79]">{{ overview.rate }}%</div>
           <div class="text-[10px] text-gray-500 mt-0.5">批注率</div>
         </Card>
+        <Card class="p-3 text-center">
+          <div class="text-lg font-black text-[#07C160]">{{ coveredStudents.covered }}<span class="text-[11px] font-normal text-gray-400">/{{ coveredStudents.total }}</span></div>
+          <div class="text-[10px] text-gray-500 mt-0.5">覆盖学员</div>
+        </Card>
       </div>
+      <p class="text-[10px] text-gray-400 px-1 -mt-2">
+        口径：应批注=范围内饮食/体重/运动记录数；待批注=其中未被对应角色批注的记录；批注率=已批注÷应批注；平均响应=记录时间到首次批注的时长。
+      </p>
 
       <!-- 批注类型明细 -->
       <Card class="p-4">
