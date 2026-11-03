@@ -117,6 +117,26 @@ function defaultBadges(campId: string): BadgeConfig[] {
   ];
 }
 
+const ACCOUNTS_STORAGE_KEY = 'camp_accounts_v2';
+
+/** 读取本地持久化的账户列表（含运营总览权限等后台配置） */
+function loadPersistedAccounts(): Account[] | null {
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+    if (!raw) return null;
+    const list = JSON.parse(raw);
+    if (Array.isArray(list) && list.length > 0) return list as Account[];
+  } catch { /* ignore */ }
+  return null;
+}
+
+/** 持久化账户列表 */
+function persistAccounts(list: Account[]) {
+  try {
+    localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(list));
+  } catch { /* ignore */ }
+}
+
 export const useAppStore = defineStore('app', () => {
   const user = ref<User | null>(null);
   /** 营养师写给学员的结营寄语 { [`${campId}_${studentId}`]: text } */
@@ -291,7 +311,8 @@ export const useAppStore = defineStore('app', () => {
   /** 营期列表 */
   const camps = ref<Camp[]>([...MOCK_CAMPS]);
   /** 账户列表（手机号=登录凭证） */
-  const accounts = ref<Account[]>([...MOCK_ACCOUNTS]);
+  const accounts = ref<Account[]>(loadPersistedAccounts() || [...MOCK_ACCOUNTS]);
+  persistAccounts(accounts.value);
 
   const selectedStudentId = ref<string | null>(null);
   const selectedDateStr = ref<string | null>(null);
@@ -347,7 +368,9 @@ export const useAppStore = defineStore('app', () => {
       rewardClaims.value = claims;
       metricConfigs.value = metricCfgs;
       camps.value = campList;
-      accounts.value = accountList;
+      // 账户以本地持久化为准（含运营总览权限等后台配置），避免刷新被种子数据覆盖
+      accounts.value = loadPersistedAccounts() || accountList;
+      persistAccounts(accounts.value);
       pointProducts.value = products;
       pointExchanges.value = exchanges;
 
@@ -415,6 +438,7 @@ export const useAppStore = defineStore('app', () => {
       accounts.value = accounts.value.map((a) =>
         a.id === user.value!.id ? { ...a, name: updates.name! } : a,
       );
+      persistAccounts(accounts.value);
     }
     // 重新持久化
     const authData = { user: user.value, timestamp: Date.now() };
@@ -435,6 +459,12 @@ export const useAppStore = defineStore('app', () => {
       }
       if (data.user && data.user.role) {
         user.value = data.user;
+        // 权限以账户数据为准：授权/收回后刷新页面也能生效
+        const acc = accounts.value.find((a) => a.id === data.user.id || a.phone === data.user.phone);
+        if (acc) {
+          user.value = { ...user.value, supervisor: acc.supervisor === true };
+          localStorage.setItem('camp_auth', JSON.stringify({ user: user.value, timestamp: Date.now() }));
+        }
         // 默认营期 = 最新一期
         selectedCampId.value = defaultCampIdFor(data.user);
         // 恢复问卷状态
@@ -771,14 +801,17 @@ export const useAppStore = defineStore('app', () => {
   // ─── 账户管理 ───
   function addAccount(account: Account) {
     accounts.value.push(account);
+    persistAccounts(accounts.value);
     api.createAccount(account).catch(() => {});
   }
   function updateAccount(id: string, updates: Partial<Account>) {
     accounts.value = accounts.value.map((a) => (a.id === id ? { ...a, ...updates } : a));
+    persistAccounts(accounts.value);
     api.updateAccount(id, updates).catch(() => {});
   }
   function deleteAccount(id: string) {
     accounts.value = accounts.value.filter((a) => a.id !== id);
+    persistAccounts(accounts.value);
     api.deleteAccount(id).catch(() => {});
   }
 
